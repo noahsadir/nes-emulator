@@ -1,0 +1,6 @@
+.DS_STORE
+roms
+.vscode
+emulator
+*.o
+*.log
