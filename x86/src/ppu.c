@@ -125,14 +125,14 @@ void ppu_drawScanline(uint8_t y) {
 
     // i <3 maf
     if (ppu_getMaskFlag(PPUMASK_SHOWBKG)) {
-        for (uint8_t tileCol = 0; tileCol < 32; tileCol++) {
-        
+        for (uint8_t tileCol = 0; tileCol < 33; tileCol++) {
+            
             uint8_t adjCol = ((tileCol + coarseX) % 32);
             uint8_t adjRow = ((tileRow + coarseY) % 32);
 
             uint16_t nametablePos = 0x2000 + nametableOffset;
             nametablePos += (((tileCol + coarseX) / 32) * 0x0400);
-
+            
             // cycle 2-3
             uint8_t nametableByte = bus_readPPU(nametablePos + adjCol + (adjRow * 32));
 
@@ -157,7 +157,10 @@ void ppu_drawScanline(uint8_t y) {
                 chrLow >>= 1;
                 chrHigh >>= 1;
 
-                backgroundPixels[(tileCol * 8) + pixCol] = colorID;
+                if (tileCol < 32) {
+                    backgroundPixels[(tileCol * 8) + pixCol] = colorID;
+                }
+                
 
                 if (colorID == 0) {
                     ppu_setPixel(ppu_colors[bus_readPPU(0x3F00)], (tileCol * 8) + pixCol - fineX, y - fineY);
