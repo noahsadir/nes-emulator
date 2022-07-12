@@ -1,0 +1,111 @@
+	section	.text,"ax",@progbits
+	assume	adl = 1
+	section	.text,"ax",@progbits
+	public	_joypad_read
+_joypad_read:
+	ld	l, 0
+	ld	a, (_buttonIndex)
+	ld	d, a
+	cp	a, 8
+	jq	c, BB0_2
+	ld	a, l
+	ld	(_buttonIndex), a
+	ld	d, l
+BB0_2:
+	ld	hl, 1
+	ld	a, (_buttonStatus)
+	ld	e, a
+	ld	a, (_strobe)
+	ld	c, 1
+	xor	a, c
+	xor	a, c
+	bit	0, a
+	jq	nz, BB0_4
+	ld	a, d
+	inc	a
+	ld	(_buttonIndex), a
+BB0_4:
+	ld	bc, 0
+	ld	c, d
+	call	__ishl
+	ld	a, l
+	and	a, e
+	or	a, a
+	jq	nz, BB0_5
+	ld	a, 0
+	ret
+BB0_5:
+	ld	a, 1
+	ret
+	section	.text,"ax",@progbits
+
+	section	.text,"ax",@progbits
+	public	_joypad_write
+_joypad_write:
+	call	__frameset0
+	ld	l, 0
+	ld	a, (ix + 6)
+	and	a, 1
+	ld	e, a
+	ld	c, 1
+	xor	a, c
+	ld	c, a
+	ld	a, e
+	ld	(_strobe), a
+	bit	0, c
+	jq	nz, BB1_2
+	ld	a, l
+	ld	(_buttonIndex), a
+BB1_2:
+	pop	ix
+	ret
+	section	.text,"ax",@progbits
+
+	section	.text,"ax",@progbits
+	public	_joypad_setButton
+_joypad_setButton:
+	call	__frameset0
+	ld	l, (ix + 6)
+	ld	a, (_buttonStatus)
+	or	a, l
+	ld	(_buttonStatus), a
+	pop	ix
+	ret
+	section	.text,"ax",@progbits
+
+	section	.text,"ax",@progbits
+	public	_joypad_unsetButton
+_joypad_unsetButton:
+	call	__frameset0
+	ld	a, (_buttonStatus)
+	ld	l, a
+	ld	a, (ix + 6)
+	cpl
+	ld	e, a
+	ld	a, l
+	and	a, e
+	ld	(_buttonStatus), a
+	pop	ix
+	ret
+	section	.text,"ax",@progbits
+
+	section	.bss,"aw",@nobits
+	public	_buttonStatus
+_buttonStatus:
+	rb	1
+
+	section	.bss,"aw",@nobits
+	public	_buttonIndex
+_buttonIndex:
+	rb	1
+
+	section	.bss,"aw",@nobits
+	public	_strobe
+_strobe:
+	rb	1
+
+	ident	"clang version 14.0.0 (https://github.com/jacobly0/llvm-project a139def90d26173f771eb1eca797633d1fbb2797)"
+	extern	__Unwind_SjLj_Register
+	extern	__Unwind_SjLj_Unregister
+	extern	__ishl
+	extern	__frameset0
