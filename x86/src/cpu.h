@@ -31,6 +31,9 @@
 
 #include "bus.h"
 
+#include <stdint.h>
+#include <stdbool.h>
+
 enum CPUStatusFlag {
     CPUSTAT_CARRY       = 0b00000001,
     CPUSTAT_ZERO        = 0b00000010,

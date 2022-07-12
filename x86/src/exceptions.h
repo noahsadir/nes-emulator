@@ -31,16 +31,52 @@
 
 #include "bus.h"
 
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
+
+/**
+ * @brief Initialize CPU trace functionality
+ */
 void exc_traceInit();
 
+/**
+ * @brief Generate generic panic message
+ * 
+ * @param message the panic message
+ */
 void exc_panic(char* message);
 
+/**
+ * @brief Generate a panic for invalid I/O operations to
+ *        the CPU address space
+ * 
+ * @param address the invalid address
+ */
 void exc_panic_invalidIO(uint16_t address);
 
+/**
+ * @brief Generate a panic for invalid I/O operations to
+ *        the PPU address space
+ * 
+ * @param address the invalid address
+ */
 void exc_panic_invalidPPUIO(uint16_t address);
 
+/**
+ * @brief Generate a panic for invalid CPU instructions
+ * 
+ * @param address the invalid opcode
+ */
 void exc_panic_illegalInstruction(uint8_t opcode);
 
+/**
+ * @brief Generate a CPU trace
+ *        Obviously this would be much easier to implement in the CPU class
+ *        itself but I've added it here so that the CPU doesn't depend on file I/O
+ * 
+ * Too many parameters, most are self-explanatory
+ */
 void exc_trace(int paramCount, char* redirectString, uint16_t address,
     uint16_t pc, char* instructionCode, uint8_t opcode, uint8_t firstParam,
     uint8_t secondParam, char* parameterString, uint16_t offsetAddress,

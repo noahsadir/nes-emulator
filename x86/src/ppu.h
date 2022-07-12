@@ -32,6 +32,9 @@
 #include "bus.h"
 #include "chars.h"
 
+#include <stdint.h>
+#include <stdbool.h>
+
 enum PPURegister {
     PPU_CONTROL,
     PPU_MASK,
@@ -77,7 +80,6 @@ enum PPUStatusFlag {
     PPUSTAT_VBLKSTART   = 0b10000000
 };
 
-// taken from https://github.com/toblu302/NESlig/blob/master/src/ppu2C02.h
 static const uint32_t ppu_colors[64] =
 {
 0x757575, 0x271B8F, 0x0000AB, 0x47009F, 0x8F0077, 0xAB0013, 0xA70000, 0x7F0B00,
@@ -90,6 +92,7 @@ static const uint32_t ppu_colors[64] =
 0xFFE7A3, 0xE3FFA3, 0xABF3BF, 0xB3FFCF, 0x9FFFF3, 0x000000, 0x000000, 0x000000
 };
 
+// Taken from NES Rust Tutorial (see readme:references)
 static const uint32_t ppu_colors2[64] = {
     0x808080, 0x003DA6, 0x0012B0, 0x440096, 0xA1005E,
     0xC70028, 0xBA0600, 0x8C1700, 0x5C2F00, 0x104500,

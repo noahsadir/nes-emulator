@@ -60,7 +60,7 @@ uint8_t bus_readCPU(uint16_t address) {
         } else if (address == 0x4017) { // apu frame counter
 
         } else {
-            if (panicOnUnimplemented) exc_panic_invalidIO(address);
+            
         }
     } else if (address < 0x6000) { // expansion rom
         exc_panic_invalidIO(address);
@@ -96,7 +96,7 @@ void bus_writeCPU(uint16_t address, uint8_t data) {
         } else if (address == 0x2007) { // ppu data
             ppu_setRegister(PPU_PPUDATA, data);
         }
-    } else if (address < 0x4020) {
+    } else if (address < 0x4020) { // i/o registers
         if (address >= 0x4000 && address <= 0x4013) { // apu
 
         } else if (address == 0x4014) { // ppu oam dma
@@ -108,7 +108,7 @@ void bus_writeCPU(uint16_t address, uint8_t data) {
         } else if (address == 0x4017) { // apu frame counter
 
         } else {
-            if (panicOnUnimplemented) exc_panic_invalidIO(address);
+            
         }    
     } else if (address < 0x6000) { // expansion rom
         if (panicOnUnimplemented) exc_panic_invalidIO(address);
@@ -213,7 +213,6 @@ void bus_writePPU(uint16_t address, uint8_t data) {
             }
         }
         vidRAM[address] = data;
-        //usleep(5000);
     } else if (address < 0x4000) {
         address &= 0b00011111;
         if (address == 0x0010 || address == 0x0014 || address == 0x0018 || address == 0x001C) {
@@ -388,8 +387,6 @@ void bus_ppuReport(uint32_t* bitmap) {
     }
     SDL_UnlockSurface(surface);
     SDL_UpdateWindowSurface(window);
-
-    
 }
 
 void bus_triggerNMI() {

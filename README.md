@@ -1,6 +1,6 @@
 # NES Emulator
 
-A basic NES Emulator written entirely in C, with portability in mind.
+A **very** basic NES Emulator written entirely in C, with portability in mind.
 
 #### Quick Note
 
@@ -12,6 +12,26 @@ The details below pertain to the x86 emulator. I may attempt to port it to the T
 
 #### Dependencies
 - SDL2
+
+#### References and Helpful Links
+
+Most of the code is original, however much of the logic was derived from the Nesdev Wiki, along with some logic from the tutorial linked below.
+
+[Nesdev Wiki](https://www.nesdev.org/wiki/Nesdev_Wiki)
+- Good source for logic and debugging
+
+[NES Rust Tutorial](https://bugzmanov.github.io/nes_ebook/)
+- NES emulation basics & project structure
+
+[6502 Instruction Set](https://www.masswerk.at/6502/6502_instruction_set.html)
+- Very comprehensive outline of 6502 instruction set
+
+[6502 Assembly Wiki](https://en.wikibooks.org/wiki/6502_Assembly)
+- More digestible breakdown of 6502 assembly & instruction set
+
+#### Documentation
+
+The source files have some inline comments, but most of the documentation is located in the header files.
 
 ## Hardware
 
@@ -41,11 +61,18 @@ Simply returning a bitmap array allows the PPU's code to remain mostly unchanged
 - Improve sprite zero hit accuracy
 - Improve scanline accuracy
 
+### APU
+
+Not implemented yet.
+
+#### Todo
+- Implement
+
 ### Bus
 
 This was originally supposed to represent the CPU bus, but ended up being the communication layer between all of the emulated hardware components. So it's really more of a motherboard implementation (which includes the busses, of course).
 
-Since I wanted to maximize portability, most of the platform specific dependencies are done through this class. Addtionally, the hardware classes should not communicate with each other, but rather pass communications through the `bus.c`.
+Since I wanted to maximize portability, most of the platform specific dependencies are done through this class. Addtionally, the hardware classes should not communicate with each other, but rather pass communications through `bus.c`.
 
 #### Todo
 - Support for basic mappers
