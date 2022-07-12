@@ -5,3 +5,6 @@ emulator
 *.o
 *.log
 CEdev
+rom_nestest.h
+bin
+obj
