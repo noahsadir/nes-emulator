@@ -1,19 +1,22 @@
 CFLAGS = -Wall
+SRC = ./src
+OBJ = ./obj
+BIN = ./bin
 
 default: clean compile link
 
 compile:
 	cd src
-	gcc $(CFLAGS) -g -O -c ./src/exceptions.c -o ./obj/exceptions.o
-	gcc $(CFLAGS) -g -O -c ./src/joypad.c -o ./obj/joypad.o
-	gcc $(CFLAGS) -g -O -c ./src/ppu.c -o ./obj/ppu.o
-	gcc $(CFLAGS) -g -O -c ./src/bus.c -o ./obj/bus.o
-	gcc $(CFLAGS) -g -O -c ./src/cpu.c -o ./obj/cpu.o
-	gcc -g -O -c ./src/main.c -o ./obj/main.o
+	gcc $(CFLAGS) -g -O -c $(SRC)/exceptions.c -o $(OBJ)/exceptions.o
+	gcc $(CFLAGS) -g -O -c $(SRC)/joypad.c -o $(OBJ)/joypad.o
+	gcc $(CFLAGS) -g -O -c $(SRC)/ppu.c -o $(OBJ)/ppu.o
+	gcc $(CFLAGS) -g -O -c $(SRC)/bus.c -o $(OBJ)/bus.o
+	gcc $(CFLAGS) -g -O -c $(SRC)/cpu.c -o $(OBJ)/cpu.o
+	gcc -g -O -c $(SRC)/main.c -o $(OBJ)/main.o
 
 link:
-	gcc -o ./bin/emulator ./obj/joypad.o ./obj/exceptions.o ./obj/ppu.o ./obj/bus.o ./obj/cpu.o ./obj/main.o -lSDL2
+	gcc -o $(BIN)/emulator $(OBJ)/joypad.o $(OBJ)/exceptions.o $(OBJ)/ppu.o $(OBJ)/bus.o $(OBJ)/cpu.o $(OBJ)/main.o -lSDL2
 
 clean:
-	rm -f ./obj/*.o
-	rm -f ./bin/emulator
+	rm -f $(OBJ)/*.o
+	rm -f $(BIN)/emulator

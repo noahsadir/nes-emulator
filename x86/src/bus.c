@@ -1,3 +1,27 @@
+/**
+ * @file bus.c
+ * 
+ * Copyright (c) 2022 Noah Sadir
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
 #include "bus.h"
 
 uint8_t cpuRAM[2048];
@@ -14,8 +38,11 @@ double elapsedTime;
 uint64_t totalTime = 0;
 uint64_t dataPoints = 0;
 bool verticalMirroring = false;
+
+// config
 bool panicOnUnimplemented = false;
 bool limitClockSpeed = true;
+bool disablePPU = false;
 
 uint64_t msecCounter = 0;
 uint64_t clocksPerMsec = 0;
@@ -238,17 +265,27 @@ void bus_startTimeMonitor() {
 
 uint64_t bus_endTimeMonitor() {
 
-    gettimeofday(&total2, NULL);
-    totalTime = (total2.tv_sec - total1.tv_sec) * 1000.0;      // sec to ms
-    totalTime += (total2.tv_usec - total1.tv_usec) / 1000.0;   // us to ms
-    totalTime *= 1000;
+    if (disablePPU) {
+        totalTime = bus_pollTimeMonitor();
+        double frequency = ((double) cpu_getCycles()) / ((double) totalTime) * 1000;
 
-    double frequency = ((double) cpu_getCycles()) / ((double) totalTime);
-    double framerate = ((double) ppu_getFrames()) / (((double) totalTime) / 1000000);
+        printf("Finished %llu cycles and %llu frames in %llu nanoseconds\n", cpu_getCycles(), ppu_getFrames(), totalTime);
+        printf("CPU Frequency: %.5f MHz\n", frequency);
+    } else {
+        gettimeofday(&total2, NULL);
+        totalTime = (total2.tv_sec - total1.tv_sec) * 1000.0;      // sec to ms
+        totalTime += (total2.tv_usec - total1.tv_usec) / 1000.0;   // us to ms
+        totalTime *= 1000;
 
-    printf("Finished %llu cycles and %llu frames in %llu microseconds\n", cpu_getCycles(), ppu_getFrames(), totalTime);
-    printf("CPU Frequency: %.5f MHz\n", frequency);
-    printf("    Framerate: %.5f FPS\n", framerate);
+        double frequency = ((double) cpu_getCycles()) / ((double) totalTime);
+        double framerate = ((double) ppu_getFrames()) / (((double) totalTime) / 1000000);
+
+        printf("Finished %llu cycles and %llu frames in %llu microseconds\n", cpu_getCycles(), ppu_getFrames(), totalTime);
+        printf("CPU Frequency: %.5f MHz\n", frequency);
+        printf("    Framerate: %.5f FPS\n", framerate);
+    }
+
+   
     return (uint64_t) elapsedTime;
 }
 
@@ -269,53 +306,59 @@ void bus_initCPU() {
 }
 
 void bus_initPPU() {
-    ppu_init(vidRAM, chrROM);
+    if (!disablePPU) {
+        ppu_init(vidRAM, chrROM);
+    }
 }
 
 void bus_initDisplay() {
-    uint16_t x = 256;
-    uint16_t y = 240;
-    uint16_t scale = 2;
-    SDL_Init(SDL_INIT_VIDEO);
-    window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, x * scale, y * scale, SDL_WINDOW_SHOWN);
-    surface = SDL_GetWindowSurface(window);
-    keyMap.up = SDLK_w;
-    keyMap.down = SDLK_s;
-    keyMap.left = SDLK_a;
-    keyMap.right = SDLK_d;
-    keyMap.a = SDLK_SPACE;
-    keyMap.b = SDLK_RSHIFT;
-    keyMap.start = SDLK_RETURN;
-    keyMap.select = SDLK_p;
+    if (!disablePPU) {
+        uint16_t x = 256;
+        uint16_t y = 240;
+        uint16_t scale = 2;
+        SDL_Init(SDL_INIT_VIDEO);
+        window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, x * scale, y * scale, SDL_WINDOW_SHOWN);
+        surface = SDL_GetWindowSurface(window);
+        keyMap.up = SDLK_w;
+        keyMap.down = SDLK_s;
+        keyMap.left = SDLK_a;
+        keyMap.right = SDLK_d;
+        keyMap.a = SDLK_SPACE;
+        keyMap.b = SDLK_RSHIFT;
+        keyMap.start = SDLK_RETURN;
+        keyMap.select = SDLK_p;
+    }
 }
 
 void bus_cpuReport(uint8_t cycleCount) {
-
-    ppu_runCycles(cycleCount * 3);
-
-    if (ppu_getControlFlag(PPUCTRL_GENVBNMI) && ppu_getStatusFlag(PPUSTAT_VBLKSTART)) {
-        bus_triggerNMI();
-        ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
-    }
     
-    // It's recommended to keep this enabled since a higher framerate will
-    // not only mess up timing/audio, but will also use 100% of CPU
-    if (limitClockSpeed) {
-        clocksPerMsec += cycleCount;
-        msecCounter += bus_pollTimeMonitor();
-        if (msecCounter >= 1000000) {
-        
-            int32_t remainingClocks = clocksPerMsec - 1789;
-            if (remainingClocks > 0) {
-                uint16_t catchup = ((double) remainingClocks) * 0.559f;
-                uint16_t framerate = ((double) ppu_getFrames()) / (((double) totalTime) / 1000000);
-                if (framerate > 60) {
-                    usleep(catchup);
-                }
-            }
+    if (!disablePPU) {
+        ppu_runCycles(cycleCount * 3);
 
-            msecCounter = 0;
-            clocksPerMsec = 0;
+        if (ppu_getControlFlag(PPUCTRL_GENVBNMI) && ppu_getStatusFlag(PPUSTAT_VBLKSTART)) {
+            bus_triggerNMI();
+            ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
+        }
+    
+        // It's recommended to keep this enabled since a higher framerate will
+        // not only mess up timing/audio, but will also use 100% of CPU
+        if (limitClockSpeed) {
+            clocksPerMsec += cycleCount;
+            msecCounter += bus_pollTimeMonitor();
+            if (msecCounter >= 1000000) {
+            
+                int32_t remainingClocks = clocksPerMsec - 1789;
+                if (remainingClocks > 0) {
+                    uint16_t catchup = ((double) remainingClocks) * 0.559f;
+                    uint16_t framerate = ((double) ppu_getFrames()) / (((double) totalTime) / 1000000);
+                    if (framerate > 60) {
+                        usleep(catchup);
+                    }
+                }
+
+                msecCounter = 0;
+                clocksPerMsec = 0;
+            }
         }
     }
 }

@@ -44,7 +44,7 @@ The CPU was written with readability in mind. Thus, there is quite a bit of repe
 After each instruction, the CPU calls `bus_cpuReport(uint8_t)`, witht the parameter being the number of cycles elapsed.
 
 #### Todo
-- Cycle accuracy
+- Cycle accuracy (account for page crosses)
 - Decimal Flag
 
 ### PPU
