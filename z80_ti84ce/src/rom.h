@@ -29,11 +29,11 @@ static const uint16_t rom_size = ROM_SIZE;
  * - Obtain a hex dump of the iNES file (with spacing/delimiters between bytes)
  * - Use string replacement (replace " " with ", 0x") to convert to array format
  * - Copy string into brackets
- * - Make comma adjustments so that it compiles
  * - Set ROM_SIZE macro to the proper size
+ * - Make comma adjustments so that it compiles
  */
 static const uint8_t rom_binary[ROM_SIZE] = {
-
+    
 };
 
 #endif

@@ -7,4 +7,18 @@ Currently, in order to run a ROM, the binary must be represented as a `uint8_t` 
 ## Compile
 
 - Configure `rom.h` with your desired ROM
-- [Follow these instructions](https://ce-programming.github.io/toolchain/static/getting-started.html) in order to generate an executable which can be installed on the calculator.
+- [Follow these instructions](https://ce-programming.github.io/toolchain/static/getting-started.html) to generate an executable which can be installed on the calculator.
+
+## Key Mappings
+
+| Key   | Joypad Button |
+|-------|---------------|
+| Down  | Down          |
+| Up    | Up            |
+| Left  | Left          |
+| Right | Right         |
+| Del   | OFF           |
+| 2nd   | Start         |
+| Mode  | Select        |
+| Alpha | A             |
+| Math  | B             |

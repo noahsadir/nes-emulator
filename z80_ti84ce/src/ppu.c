@@ -55,7 +55,11 @@ void ppu_init(uint8_t* vram, uint8_t* crom) {
     vidRAM_Ptr = vram;
     chrROM_Ptr = crom;
     //ppu_drawCHRROM(0);
-    for (int i = 0; i < 61440; i++) {
+    gfx_SetColor(0);
+    for (int y = 0; y < 240; y++) {
+        for (int x = 0; x < 320; x++) {
+            gfx_SetPixel(x, y);
+        }
         //bitmap[i] = 0;
     }
 }
@@ -107,11 +111,18 @@ void ppu_setPixel(uint32_t color, int16_t x, int16_t y) {
         if (color == 0) {
             gfx_SetColor(0);
         } else {
-            gfx_SetColor(255);
+            gfx_SetColor(gfx_RGBTo1555(color & 0xFF0000, color & 0x00FF00, color & 0x0000FF));
         }
         
-        gfx_SetPixel(x, y);
-        //bitmap[location] = color;
+        gfx_SetPixel(32 + x, y);
+
+        if (x == 255) {
+            gfx_SetColor(rand() % 256);
+            gfx_SetPixel(287,y);
+            gfx_SetPixel(288,y);
+            gfx_SetPixel(289,y);
+            gfx_SetPixel(290,y);
+        }
     }
 }
 

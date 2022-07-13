@@ -276,7 +276,6 @@ void bus_initDisplay() {
 
 void bus_cpuReport(uint8_t cycleCount) {
     ppu_runCycles(cycleCount * 3);
-
     
     if (ppu_getControlFlag(PPUCTRL_GENVBNMI) && ppu_getStatusFlag(PPUSTAT_VBLKSTART)) {
         bus_triggerNMI();
@@ -286,30 +285,36 @@ void bus_cpuReport(uint8_t cycleCount) {
 }
 
 void bus_ppuReport() {
-    
     kb_key_t key;
 
-    /* Update kb_Data */
     kb_Scan();
 
-    /* Load group 7 registers */
     key = kb_Data[7];
+
+    joypad_unsetButton(JP_DOWN);
+    joypad_unsetButton(JP_RIGHT);
+    joypad_unsetButton(JP_UP);
+    joypad_unsetButton(JP_LEFT);
+    joypad_unsetButton(JP_START);
+    joypad_unsetButton(JP_SELECT);
+    joypad_unsetButton(JP_BTN_A);
+    joypad_unsetButton(JP_BTN_B);
 
     switch (key)
     {
-        case kb_Down:           /* Change screen color to black */
+        case kb_Down:  
             joypad_setButton(JP_DOWN);
             break;
 
-        case kb_Right:          /* Change screen color to red */
+        case kb_Right:   
             joypad_setButton(JP_RIGHT);
             break;
 
-        case kb_Up:             /* Change screen color to white */
+        case kb_Up:   
             joypad_setButton(JP_UP);
             break;
 
-        case kb_Left:           /* Change screen color to a different red */
+        case kb_Left: 
             joypad_setButton(JP_LEFT);
             break;
 
@@ -321,16 +326,16 @@ void bus_ppuReport() {
 
     switch (key)
     {
-        case kb_Del:           /* Change screen color to black */
+        case kb_Del:   
             gfx_End();
             exit(0);
             break;
 
-        case kb_2nd:          /* Change screen color to red */
+        case kb_2nd:      
             joypad_setButton(JP_START);
             break;
 
-        case kb_Mode:             /* Change screen color to white */
+        case kb_Mode:     
             joypad_setButton(JP_SELECT);
             break;
         default:
@@ -341,17 +346,18 @@ void bus_ppuReport() {
 
     switch (key)
     {
-        case kb_Alpha:           /* Change screen color to black */
+        case kb_Alpha:  
             joypad_setButton(JP_BTN_A);
             break;
 
-        case kb_Math:          /* Change screen color to red */
+        case kb_Math:      
             joypad_setButton(JP_BTN_B);
             break;
 
         default:
             break;
     }
+    
     
 }
 
