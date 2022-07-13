@@ -43,7 +43,7 @@ void cpu_init() {
     enum Instruction instruction = NOP;
     
     bus_startTimeMonitor();
-    while (instruction != BRK && reg_pc != 0xFFFD && !didPanic && cycles <= 10000000000) {
+    while (instruction != BRK && reg_pc != 0xFFFD && !didPanic) {
         uint64_t oldCycles = cycles;
         instruction = cpu_execute();
         bus_cpuReport(cycles - oldCycles);
