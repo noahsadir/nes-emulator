@@ -8,3 +8,5 @@ CEdev
 rom_nestest.h
 bin
 obj
+cpu_opt_attempt.c
+cpu_opt_attempt.h

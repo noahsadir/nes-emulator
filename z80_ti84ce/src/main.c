@@ -1,11 +1,35 @@
+/**
+ * @file main.c
+ * 
+ * Copyright (c) 2022 Noah Sadir
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
 #include "bus.h"
-#include "rom_nestest.h"
+#include "rom.h"
 #include <tice.h>
 #include <stdio.h>
 #include <graphx.h>
 
 uint8_t* tifile_bin;
-uint32_t tifile_size = 24592;
+uint32_t tifile_size = 0;
 uint32_t tifile_index = 0;
 
 void tifile_init(uint8_t* binary, uint32_t size) {
@@ -16,9 +40,11 @@ void tifile_init(uint8_t* binary, uint32_t size) {
 
 int main() {
     os_ClrHome();
-    tifile_init(nestest_rom, 24592);
+    tifile_init(rom_binary, rom_size);
 
     uint8_t buffer[16];
+
+    // calculator seems to have issues with large statically allocated arrays
     uint8_t* prgROM = malloc(32768 * sizeof(uint8_t));
     uint8_t* chrROM = malloc(8192 * sizeof(uint8_t));
     uint8_t trainer[512];

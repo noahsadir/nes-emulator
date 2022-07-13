@@ -1,3 +1,27 @@
+/**
+ * @file cpu.c
+ * 
+ * Copyright (c) 2022 Noah Sadir
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
 #include "cpu.h"
 
 uint8_t reg_status = 0x24;
@@ -32,7 +56,6 @@ void cpu_vblankNMI() {
     cpu_stackPush16(reg_pc);
     cpu_stackPush(reg_status);
     cpu_setFlag(CPUSTAT_NO_INTRPT, true);
-    cycles += 2;
     reg_pc = bus_readCPUAddr(0xFFFA);
 }
 
@@ -68,7 +91,7 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
             address = (((uint16_t) bus_readCPU(reg_pc)) << 8) | address; // cycle
             reg_pc += 1;
 
-            cycles += 2;
+            // cycles += 2;
             return address;
         }
         case ADM_ZEROPAGE:
@@ -77,7 +100,7 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
             reg_pc += 1;
             address %= 256;
 
-            cycles += 1;
+            // cycles += 1;
             return address;
         }
         case ADM_RELATIVE:
@@ -99,7 +122,7 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
             high = high << 8;
             uint16_t address = (high | low);
 
-            cycles += 4;
+            // cycles += 4;
             return address;
         }
         case ADM_ABS_X:
@@ -110,7 +133,7 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
             reg_pc += 1;
             address += reg_x;
             
-            cycles += 3;
+            // cycles += 3;
             return address;
         }
         case ADM_ABS_Y:
@@ -121,7 +144,7 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
             reg_pc += 1;
             address += reg_y; // cycle
 
-            cycles += 3;
+            // cycles += 3;
             return address;
         }
         case ADM_ZP_X:
@@ -131,7 +154,7 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
             address += reg_x; // cycle
             address %= 256;
 
-            cycles += 2;
+            // cycles += 2;
             return address;
         }
         case ADM_ZP_Y:
@@ -141,7 +164,7 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
             address += reg_y; // cycle
             address %= 256;
 
-            cycles += 2;
+            // cycles += 2;
             return address;
         }
         case ADM_ZP_INDIRECT_X:
@@ -157,7 +180,7 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
             high = high << 8;
             address = (high | low);
 
-            cycles += 4;
+            // cycles += 4;
             return address;
 
         }
@@ -173,7 +196,7 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
             address = (high | low);
             address += reg_y; // cycle
 
-            cycles += 4;
+            // cycles += 4;
             return address;
 
         }
@@ -209,7 +232,7 @@ void cpu_stackPush(uint8_t val) {
     } else {
         bus_writeCPU(0x100 + stackPointer, val);
         stackPointer -= 1;
-        cycles += 1;
+        // cycles += 1;
     }
 }
 
@@ -219,7 +242,7 @@ uint8_t cpu_stackPull() {
     } else {
         stackPointer += 1;
         uint8_t val = bus_readCPU(0x100 + stackPointer);
-        cycles += 2;
+        // cycles += 2;
         return val;
     }
     return 0;
@@ -239,7 +262,7 @@ void cpu_stackPush16(uint16_t val) {
 
         
 
-        cycles += 2;
+        // cycles += 2;
     }
 }
 
@@ -254,7 +277,7 @@ uint16_t cpu_stackPull16() {
         stackPointer += 1;
         uint8_t high = bus_readCPU(0x100 + stackPointer);
 
-        cycles += 4;
+        // cycles += 4;
 
         uint16_t addr = (((uint16_t) high) << 8) | ((uint16_t) low);
 
@@ -523,330 +546,330 @@ uint8_t cpu_execute() {
 
     uint8_t opcode = bus_readCPU(reg_pc);
     reg_pc += 1;
-    cycles += 1;
+    // cycles += 1;
     
     switch (opcode) {
         // LDA
-        case 0xAD: return cpu_instruction(LDA, ADM_ABSOLUTE);
-        case 0xBD: return cpu_instruction(LDA, ADM_ABS_X);
-        case 0xB9: return cpu_instruction(LDA, ADM_ABS_Y);
-        case 0xA9: return cpu_instruction(LDA, ADM_IMMEDIATE);
-        case 0xA5: return cpu_instruction(LDA, ADM_ZEROPAGE);
-        case 0xA1: return cpu_instruction(LDA, ADM_ZP_INDIRECT_X);
-        case 0xB5: return cpu_instruction(LDA, ADM_ZP_X);
-        case 0xB1: return cpu_instruction(LDA, ADM_ZP_INDIRECT_Y);
+        case 0xAD: cycles += 4; return cpu_instruction(LDA, ADM_ABSOLUTE);
+        case 0xBD: cycles += 4; return cpu_instruction(LDA, ADM_ABS_X);
+        case 0xB9: cycles += 4; return cpu_instruction(LDA, ADM_ABS_Y);
+        case 0xA9: cycles += 2; return cpu_instruction(LDA, ADM_IMMEDIATE);
+        case 0xA5: cycles += 3; return cpu_instruction(LDA, ADM_ZEROPAGE);
+        case 0xA1: cycles += 6; return cpu_instruction(LDA, ADM_ZP_INDIRECT_X);
+        case 0xB5: cycles += 4; return cpu_instruction(LDA, ADM_ZP_X);
+        case 0xB1: cycles += 5; return cpu_instruction(LDA, ADM_ZP_INDIRECT_Y);
         // LDX
-        case 0xAE: return cpu_instruction(LDX, ADM_ABSOLUTE);
-        case 0xBE: return cpu_instruction(LDX, ADM_ABS_Y);
-        case 0xA2: return cpu_instruction(LDX, ADM_IMMEDIATE);
-        case 0xA6: return cpu_instruction(LDX, ADM_ZEROPAGE);
-        case 0xB6: return cpu_instruction(LDX, ADM_ZP_Y);
+        case 0xAE: cycles += 4; return cpu_instruction(LDX, ADM_ABSOLUTE);
+        case 0xBE: cycles += 4; return cpu_instruction(LDX, ADM_ABS_Y);
+        case 0xA2: cycles += 2; return cpu_instruction(LDX, ADM_IMMEDIATE);
+        case 0xA6: cycles += 3; return cpu_instruction(LDX, ADM_ZEROPAGE);
+        case 0xB6: cycles += 4; return cpu_instruction(LDX, ADM_ZP_Y);
         // LDY
-        case 0xAC: return cpu_instruction(LDY, ADM_ABSOLUTE);
-        case 0xBC: return cpu_instruction(LDY, ADM_ABS_X);
-        case 0xA0: return cpu_instruction(LDY, ADM_IMMEDIATE);
-        case 0xA4: return cpu_instruction(LDY, ADM_ZEROPAGE);
-        case 0xB4: return cpu_instruction(LDY, ADM_ZP_X);
+        case 0xAC: cycles += 4; return cpu_instruction(LDY, ADM_ABSOLUTE);
+        case 0xBC: cycles += 4; return cpu_instruction(LDY, ADM_ABS_X);
+        case 0xA0: cycles += 2; return cpu_instruction(LDY, ADM_IMMEDIATE);
+        case 0xA4: cycles += 3; return cpu_instruction(LDY, ADM_ZEROPAGE);
+        case 0xB4: cycles += 4; return cpu_instruction(LDY, ADM_ZP_X);
         // STA
-        case 0x8D: return cpu_instruction(STA, ADM_ABSOLUTE);
-        case 0x9D: return cpu_instruction(STA, ADM_ABS_X);
-        case 0x99: return cpu_instruction(STA, ADM_ABS_Y);
-        case 0x85: return cpu_instruction(STA, ADM_ZEROPAGE);
-        case 0x81: return cpu_instruction(STA, ADM_ZP_INDIRECT_X);
-        case 0x95: return cpu_instruction(STA, ADM_ZP_X);
-        case 0x91: return cpu_instruction(STA, ADM_ZP_INDIRECT_Y);
+        case 0x8D: cycles += 4; return cpu_instruction(STA, ADM_ABSOLUTE);
+        case 0x9D: cycles += 5; return cpu_instruction(STA, ADM_ABS_X);
+        case 0x99: cycles += 5; return cpu_instruction(STA, ADM_ABS_Y);
+        case 0x85: cycles += 3; return cpu_instruction(STA, ADM_ZEROPAGE);
+        case 0x81: cycles += 6; return cpu_instruction(STA, ADM_ZP_INDIRECT_X);
+        case 0x95: cycles += 4; return cpu_instruction(STA, ADM_ZP_X);
+        case 0x91: cycles += 6; return cpu_instruction(STA, ADM_ZP_INDIRECT_Y);
         // STX
-        case 0x8E: return cpu_instruction(STX, ADM_ABSOLUTE);
-        case 0x86: return cpu_instruction(STX, ADM_ZEROPAGE);
-        case 0x96: return cpu_instruction(STX, ADM_ZP_Y);
+        case 0x8E: cycles += 4; return cpu_instruction(STX, ADM_ABSOLUTE);
+        case 0x86: cycles += 3; return cpu_instruction(STX, ADM_ZEROPAGE);
+        case 0x96: cycles += 4; return cpu_instruction(STX, ADM_ZP_Y);
         // STY
-        case 0x8C: return cpu_instruction(STY, ADM_ABSOLUTE);
-        case 0x84: return cpu_instruction(STY, ADM_ZEROPAGE);
-        case 0x94: return cpu_instruction(STY, ADM_ZP_X);
+        case 0x8C: cycles += 4; return cpu_instruction(STY, ADM_ABSOLUTE);
+        case 0x84: cycles += 3; return cpu_instruction(STY, ADM_ZEROPAGE);
+        case 0x94: cycles += 4; return cpu_instruction(STY, ADM_ZP_X);
         // ADC
-        case 0x6D: return cpu_instruction(ADC, ADM_ABSOLUTE);
-        case 0x7D: return cpu_instruction(ADC, ADM_ABS_X);
-        case 0x79: return cpu_instruction(ADC, ADM_ABS_Y);
-        case 0x69: return cpu_instruction(ADC, ADM_IMMEDIATE);
-        case 0x65: return cpu_instruction(ADC, ADM_ZEROPAGE);
-        case 0x61: return cpu_instruction(ADC, ADM_ZP_INDIRECT_X);
-        case 0x75: return cpu_instruction(ADC, ADM_ZP_X);
-        case 0x71: return cpu_instruction(ADC, ADM_ZP_INDIRECT_Y);
+        case 0x6D: cycles += 4; return cpu_instruction(ADC, ADM_ABSOLUTE);
+        case 0x7D: cycles += 4; return cpu_instruction(ADC, ADM_ABS_X);
+        case 0x79: cycles += 4; return cpu_instruction(ADC, ADM_ABS_Y);
+        case 0x69: cycles += 2; return cpu_instruction(ADC, ADM_IMMEDIATE);
+        case 0x65: cycles += 3; return cpu_instruction(ADC, ADM_ZEROPAGE);
+        case 0x61: cycles += 6; return cpu_instruction(ADC, ADM_ZP_INDIRECT_X);
+        case 0x75: cycles += 4; return cpu_instruction(ADC, ADM_ZP_X);
+        case 0x71: cycles += 5; return cpu_instruction(ADC, ADM_ZP_INDIRECT_Y);
         // SBC
-        case 0xED: return cpu_instruction(SBC, ADM_ABSOLUTE);
-        case 0xFD: return cpu_instruction(SBC, ADM_ABS_X);
-        case 0xF9: return cpu_instruction(SBC, ADM_ABS_Y);
-        case 0xE9: return cpu_instruction(SBC, ADM_IMMEDIATE);
-        case 0xE5: return cpu_instruction(SBC, ADM_ZEROPAGE);
-        case 0xE1: return cpu_instruction(SBC, ADM_ZP_INDIRECT_X);
-        case 0xF5: return cpu_instruction(SBC, ADM_ZP_X);
-        case 0xF1: return cpu_instruction(SBC, ADM_ZP_INDIRECT_Y);
+        case 0xED: cycles += 4; return cpu_instruction(SBC, ADM_ABSOLUTE);
+        case 0xFD: cycles += 4; return cpu_instruction(SBC, ADM_ABS_X);
+        case 0xF9: cycles += 4; return cpu_instruction(SBC, ADM_ABS_Y);
+        case 0xE9: cycles += 2; return cpu_instruction(SBC, ADM_IMMEDIATE);
+        case 0xE5: cycles += 3; return cpu_instruction(SBC, ADM_ZEROPAGE);
+        case 0xE1: cycles += 6; return cpu_instruction(SBC, ADM_ZP_INDIRECT_X);
+        case 0xF5: cycles += 4; return cpu_instruction(SBC, ADM_ZP_X);
+        case 0xF1: cycles += 5; return cpu_instruction(SBC, ADM_ZP_INDIRECT_Y);
         // INC
-        case 0xEE: return cpu_instruction(INC, ADM_ABSOLUTE);
-        case 0xFE: return cpu_instruction(INC, ADM_ABS_X);
-        case 0xE6: return cpu_instruction(INC, ADM_ZEROPAGE);
-        case 0xF6: return cpu_instruction(INC, ADM_ZP_X);
+        case 0xEE: cycles += 6; return cpu_instruction(INC, ADM_ABSOLUTE);
+        case 0xFE: cycles += 7; return cpu_instruction(INC, ADM_ABS_X);
+        case 0xE6: cycles += 5; return cpu_instruction(INC, ADM_ZEROPAGE);
+        case 0xF6: cycles += 6; return cpu_instruction(INC, ADM_ZP_X);
         // INX
-        case 0xE8: return cpu_instruction(INX, ADM_IMPLIED);
+        case 0xE8: cycles += 2; return cpu_instruction(INX, ADM_IMPLIED);
         // INY
-        case 0xC8: return cpu_instruction(INY, ADM_IMPLIED);
+        case 0xC8: cycles += 2; return cpu_instruction(INY, ADM_IMPLIED);
         // DEC
-        case 0xCE: return cpu_instruction(DEC, ADM_ABSOLUTE);
-        case 0xDE: return cpu_instruction(DEC, ADM_ABS_X);
-        case 0xC6: return cpu_instruction(DEC, ADM_ZEROPAGE);
-        case 0xD6: return cpu_instruction(DEC, ADM_ZP_X);
+        case 0xCE: cycles += 6; return cpu_instruction(DEC, ADM_ABSOLUTE);
+        case 0xDE: cycles += 7; return cpu_instruction(DEC, ADM_ABS_X);
+        case 0xC6: cycles += 5; return cpu_instruction(DEC, ADM_ZEROPAGE);
+        case 0xD6: cycles += 6; return cpu_instruction(DEC, ADM_ZP_X);
         // DEX
-        case 0xCA: return cpu_instruction(DEX, ADM_IMPLIED);
+        case 0xCA: cycles += 2; return cpu_instruction(DEX, ADM_IMPLIED);
         // DEY
-        case 0x88: return cpu_instruction(DEY, ADM_IMPLIED);
+        case 0x88: cycles += 2; return cpu_instruction(DEY, ADM_IMPLIED);
         // ASL
-        case 0x0E: return cpu_instruction(ASL, ADM_ABSOLUTE);
-        case 0x1E: return cpu_instruction(ASL, ADM_ABS_X);
-        case 0x0A: return cpu_instruction(ASL, ADM_ACCUMULATOR);
-        case 0x06: return cpu_instruction(ASL, ADM_ZEROPAGE);
-        case 0x16: return cpu_instruction(ASL, ADM_ZP_X);
+        case 0x0E: cycles += 6; return cpu_instruction(ASL, ADM_ABSOLUTE);
+        case 0x1E: cycles += 7; return cpu_instruction(ASL, ADM_ABS_X);
+        case 0x0A: cycles += 2; return cpu_instruction(ASL, ADM_ACCUMULATOR);
+        case 0x06: cycles += 5; return cpu_instruction(ASL, ADM_ZEROPAGE);
+        case 0x16: cycles += 6; return cpu_instruction(ASL, ADM_ZP_X);
         // LSR
-        case 0x4E: return cpu_instruction(LSR, ADM_ABSOLUTE);
-        case 0x5E: return cpu_instruction(LSR, ADM_ABS_X);
-        case 0x4A: return cpu_instruction(LSR, ADM_ACCUMULATOR);
-        case 0x46: return cpu_instruction(LSR, ADM_ZEROPAGE);
-        case 0x56: return cpu_instruction(LSR, ADM_ZP_X);
+        case 0x4E: cycles += 6; return cpu_instruction(LSR, ADM_ABSOLUTE);
+        case 0x5E: cycles += 7; return cpu_instruction(LSR, ADM_ABS_X);
+        case 0x4A: cycles += 2; return cpu_instruction(LSR, ADM_ACCUMULATOR);
+        case 0x46: cycles += 5; return cpu_instruction(LSR, ADM_ZEROPAGE);
+        case 0x56: cycles += 6; return cpu_instruction(LSR, ADM_ZP_X);
         // ROL
-        case 0x2E: return cpu_instruction(ROL, ADM_ABSOLUTE);
-        case 0x3E: return cpu_instruction(ROL, ADM_ABS_X);
-        case 0x2A: return cpu_instruction(ROL, ADM_ACCUMULATOR);
-        case 0x26: return cpu_instruction(ROL, ADM_ZEROPAGE);
-        case 0x36: return cpu_instruction(ROL, ADM_ZP_X);
+        case 0x2E: cycles += 6; return cpu_instruction(ROL, ADM_ABSOLUTE);
+        case 0x3E: cycles += 7; return cpu_instruction(ROL, ADM_ABS_X);
+        case 0x2A: cycles += 2; return cpu_instruction(ROL, ADM_ACCUMULATOR);
+        case 0x26: cycles += 5; return cpu_instruction(ROL, ADM_ZEROPAGE);
+        case 0x36: cycles += 6; return cpu_instruction(ROL, ADM_ZP_X);
         // ROR
-        case 0x6E: return cpu_instruction(ROR, ADM_ABSOLUTE);
-        case 0x7E: return cpu_instruction(ROR, ADM_ABS_X);
-        case 0x6A: return cpu_instruction(ROR, ADM_ACCUMULATOR);
-        case 0x66: return cpu_instruction(ROR, ADM_ZEROPAGE);
-        case 0x76: return cpu_instruction(ROR, ADM_ZP_X);
+        case 0x6E: cycles += 6; return cpu_instruction(ROR, ADM_ABSOLUTE);
+        case 0x7E: cycles += 7; return cpu_instruction(ROR, ADM_ABS_X);
+        case 0x6A: cycles += 2; return cpu_instruction(ROR, ADM_ACCUMULATOR);
+        case 0x66: cycles += 5; return cpu_instruction(ROR, ADM_ZEROPAGE);
+        case 0x76: cycles += 6; return cpu_instruction(ROR, ADM_ZP_X);
         // AND
-        case 0x2D: return cpu_instruction(AND, ADM_ABSOLUTE);
-        case 0x3D: return cpu_instruction(AND, ADM_ABS_X);
-        case 0x39: return cpu_instruction(AND, ADM_ABS_Y);
-        case 0x29: return cpu_instruction(AND, ADM_IMMEDIATE);
-        case 0x25: return cpu_instruction(AND, ADM_ZEROPAGE);
-        case 0x21: return cpu_instruction(AND, ADM_ZP_INDIRECT_X);
-        case 0x35: return cpu_instruction(AND, ADM_ZP_X);
-        case 0x31: return cpu_instruction(AND, ADM_ZP_INDIRECT_Y);
+        case 0x2D: cycles += 4; return cpu_instruction(AND, ADM_ABSOLUTE);
+        case 0x3D: cycles += 4; return cpu_instruction(AND, ADM_ABS_X);
+        case 0x39: cycles += 4; return cpu_instruction(AND, ADM_ABS_Y);
+        case 0x29: cycles += 2; return cpu_instruction(AND, ADM_IMMEDIATE);
+        case 0x25: cycles += 3; return cpu_instruction(AND, ADM_ZEROPAGE);
+        case 0x21: cycles += 6; return cpu_instruction(AND, ADM_ZP_INDIRECT_X);
+        case 0x35: cycles += 4; return cpu_instruction(AND, ADM_ZP_X);
+        case 0x31: cycles += 5; return cpu_instruction(AND, ADM_ZP_INDIRECT_Y);
         // ORA
-        case 0x0D: return cpu_instruction(ORA, ADM_ABSOLUTE);
-        case 0x1D: return cpu_instruction(ORA, ADM_ABS_X);
-        case 0x19: return cpu_instruction(ORA, ADM_ABS_Y);
-        case 0x09: return cpu_instruction(ORA, ADM_IMMEDIATE);
-        case 0x05: return cpu_instruction(ORA, ADM_ZEROPAGE);
-        case 0x01: return cpu_instruction(ORA, ADM_ZP_INDIRECT_X);
-        case 0x15: return cpu_instruction(ORA, ADM_ZP_X);
-        case 0x11: return cpu_instruction(ORA, ADM_ZP_INDIRECT_Y);
+        case 0x0D: cycles += 4; return cpu_instruction(ORA, ADM_ABSOLUTE);
+        case 0x1D: cycles += 4; return cpu_instruction(ORA, ADM_ABS_X);
+        case 0x19: cycles += 4; return cpu_instruction(ORA, ADM_ABS_Y);
+        case 0x09: cycles += 2; return cpu_instruction(ORA, ADM_IMMEDIATE);
+        case 0x05: cycles += 3; return cpu_instruction(ORA, ADM_ZEROPAGE);
+        case 0x01: cycles += 6; return cpu_instruction(ORA, ADM_ZP_INDIRECT_X);
+        case 0x15: cycles += 4; return cpu_instruction(ORA, ADM_ZP_X);
+        case 0x11: cycles += 5; return cpu_instruction(ORA, ADM_ZP_INDIRECT_Y);
         // EOR
-        case 0x4D: return cpu_instruction(EOR, ADM_ABSOLUTE);
-        case 0x5D: return cpu_instruction(EOR, ADM_ABS_X);
-        case 0x59: return cpu_instruction(EOR, ADM_ABS_Y);
-        case 0x49: return cpu_instruction(EOR, ADM_IMMEDIATE);
-        case 0x45: return cpu_instruction(EOR, ADM_ZEROPAGE);
-        case 0x41: return cpu_instruction(EOR, ADM_ZP_INDIRECT_X);
-        case 0x55: return cpu_instruction(EOR, ADM_ZP_X);
-        case 0x51: return cpu_instruction(EOR, ADM_ZP_INDIRECT_Y);
+        case 0x4D: cycles += 4; return cpu_instruction(EOR, ADM_ABSOLUTE);
+        case 0x5D: cycles += 4; return cpu_instruction(EOR, ADM_ABS_X);
+        case 0x59: cycles += 4; return cpu_instruction(EOR, ADM_ABS_Y);
+        case 0x49: cycles += 2; return cpu_instruction(EOR, ADM_IMMEDIATE);
+        case 0x45: cycles += 3; return cpu_instruction(EOR, ADM_ZEROPAGE);
+        case 0x41: cycles += 6; return cpu_instruction(EOR, ADM_ZP_INDIRECT_X);
+        case 0x55: cycles += 4; return cpu_instruction(EOR, ADM_ZP_X);
+        case 0x51: cycles += 5; return cpu_instruction(EOR, ADM_ZP_INDIRECT_Y);
         // CMP
-        case 0xCD: return cpu_instruction(CMP, ADM_ABSOLUTE);
-        case 0xDD: return cpu_instruction(CMP, ADM_ABS_X);
-        case 0xD9: return cpu_instruction(CMP, ADM_ABS_Y);
-        case 0xC9: return cpu_instruction(CMP, ADM_IMMEDIATE);
-        case 0xC5: return cpu_instruction(CMP, ADM_ZEROPAGE);
-        case 0xC1: return cpu_instruction(CMP, ADM_ZP_INDIRECT_X);
-        case 0xD5: return cpu_instruction(CMP, ADM_ZP_X);
-        case 0xD1: return cpu_instruction(CMP, ADM_ZP_INDIRECT_Y);
+        case 0xCD: cycles += 4; return cpu_instruction(CMP, ADM_ABSOLUTE);
+        case 0xDD: cycles += 4; return cpu_instruction(CMP, ADM_ABS_X);
+        case 0xD9: cycles += 4; return cpu_instruction(CMP, ADM_ABS_Y);
+        case 0xC9: cycles += 2; return cpu_instruction(CMP, ADM_IMMEDIATE);
+        case 0xC5: cycles += 3; return cpu_instruction(CMP, ADM_ZEROPAGE);
+        case 0xC1: cycles += 6; return cpu_instruction(CMP, ADM_ZP_INDIRECT_X);
+        case 0xD5: cycles += 4; return cpu_instruction(CMP, ADM_ZP_X);
+        case 0xD1: cycles += 5; return cpu_instruction(CMP, ADM_ZP_INDIRECT_Y);
         // CPX
-        case 0xEC: return cpu_instruction(CPX, ADM_ABSOLUTE);
-        case 0xE0: return cpu_instruction(CPX, ADM_IMMEDIATE);
-        case 0xE4: return cpu_instruction(CPX, ADM_ZEROPAGE);
+        case 0xEC: cycles += 4; return cpu_instruction(CPX, ADM_ABSOLUTE);
+        case 0xE0: cycles += 2; return cpu_instruction(CPX, ADM_IMMEDIATE);
+        case 0xE4: cycles += 3; return cpu_instruction(CPX, ADM_ZEROPAGE);
         // CPY
-        case 0xCC: return cpu_instruction(CPY, ADM_ABSOLUTE);
-        case 0xC0: return cpu_instruction(CPY, ADM_IMMEDIATE);
-        case 0xC4: return cpu_instruction(CPY, ADM_ZEROPAGE);
+        case 0xCC: cycles += 4; return cpu_instruction(CPY, ADM_ABSOLUTE);
+        case 0xC0: cycles += 2; return cpu_instruction(CPY, ADM_IMMEDIATE);
+        case 0xC4: cycles += 3; return cpu_instruction(CPY, ADM_ZEROPAGE);
         // BIT
-        case 0x2C: return cpu_instruction(BIT, ADM_ABSOLUTE);
-        case 0x89: return cpu_instruction(BIT, ADM_IMMEDIATE);
-        case 0x24: return cpu_instruction(BIT, ADM_ZEROPAGE);
+        case 0x2C: cycles += 4; return cpu_instruction(BIT, ADM_ABSOLUTE);
+        case 0x89: cycles += 2; return cpu_instruction(BIT, ADM_IMMEDIATE);
+        case 0x24: cycles += 3; return cpu_instruction(BIT, ADM_ZEROPAGE);
         // BCC
-        case 0x90: return cpu_instruction(BCC, ADM_RELATIVE);
+        case 0x90: cycles += 2; return cpu_instruction(BCC, ADM_RELATIVE);
         // BCS
-        case 0xB0: return cpu_instruction(BCS, ADM_RELATIVE);
+        case 0xB0: cycles += 2; return cpu_instruction(BCS, ADM_RELATIVE);
         // BNE
-        case 0xD0: return cpu_instruction(BNE, ADM_RELATIVE);
+        case 0xD0: cycles += 2; return cpu_instruction(BNE, ADM_RELATIVE);
         // BEQ
-        case 0xF0: return cpu_instruction(BEQ, ADM_RELATIVE);
+        case 0xF0: cycles += 2; return cpu_instruction(BEQ, ADM_RELATIVE);
         // BPL
-        case 0x10: return cpu_instruction(BPL, ADM_RELATIVE);
+        case 0x10: cycles += 2; return cpu_instruction(BPL, ADM_RELATIVE);
         // BMI
-        case 0x30: return cpu_instruction(BMI, ADM_RELATIVE);
+        case 0x30: cycles += 2; return cpu_instruction(BMI, ADM_RELATIVE);
         // BVC
-        case 0x50: return cpu_instruction(BVC, ADM_RELATIVE);
+        case 0x50: cycles += 2; return cpu_instruction(BVC, ADM_RELATIVE);
         // BVS
-        case 0x70: return cpu_instruction(BVS, ADM_RELATIVE);
+        case 0x70: cycles += 2; return cpu_instruction(BVS, ADM_RELATIVE);
         // TAX
-        case 0xAA: return cpu_instruction(TAX, ADM_IMPLIED);
+        case 0xAA: cycles += 2; return cpu_instruction(TAX, ADM_IMPLIED);
         // TXA
-        case 0x8A: return cpu_instruction(TXA, ADM_IMPLIED);
+        case 0x8A: cycles += 2; return cpu_instruction(TXA, ADM_IMPLIED);
         // TAY
-        case 0xA8: return cpu_instruction(TAY, ADM_IMPLIED);
+        case 0xA8: cycles += 2; return cpu_instruction(TAY, ADM_IMPLIED);
         // TYA
-        case 0x98: return cpu_instruction(TYA, ADM_IMPLIED);
+        case 0x98: cycles += 2; return cpu_instruction(TYA, ADM_IMPLIED);
         // TSX
-        case 0xBA: return cpu_instruction(TSX, ADM_IMPLIED);
+        case 0xBA: cycles += 2; return cpu_instruction(TSX, ADM_IMPLIED);
         // TXS
-        case 0x9A: return cpu_instruction(TXS, ADM_IMPLIED);
+        case 0x9A: cycles += 2; return cpu_instruction(TXS, ADM_IMPLIED);
         // PHA
-        case 0x48: return cpu_instruction(PHA, ADM_IMPLIED);
+        case 0x48: cycles += 3; return cpu_instruction(PHA, ADM_IMPLIED);
         // PLA
-        case 0x68: return cpu_instruction(PLA, ADM_IMPLIED);
+        case 0x68: cycles += 4; return cpu_instruction(PLA, ADM_IMPLIED);
         // PHP
-        case 0x08: return cpu_instruction(PHP, ADM_IMPLIED);
+        case 0x08: cycles += 3; return cpu_instruction(PHP, ADM_IMPLIED);
         // PLP
-        case 0x28: return cpu_instruction(PLP, ADM_IMPLIED);
+        case 0x28: cycles += 4; return cpu_instruction(PLP, ADM_IMPLIED);
         // JMP
-        case 0x4C: return cpu_instruction(JMP, ADM_ABSOLUTE);
-        case 0x6C: return cpu_instruction(JMP, ADM_ABS_INDIRECT);
+        case 0x4C: cycles += 3; return cpu_instruction(JMP, ADM_ABSOLUTE);
+        case 0x6C: cycles += 5; return cpu_instruction(JMP, ADM_ABS_INDIRECT);
         // JSR
-        case 0x20: return cpu_instruction(JSR, ADM_ABSOLUTE);
+        case 0x20: cycles += 6; return cpu_instruction(JSR, ADM_ABSOLUTE);
         // RTS
-        case 0x60: return cpu_instruction(RTS, ADM_IMPLIED);
+        case 0x60: cycles += 6; return cpu_instruction(RTS, ADM_IMPLIED);
         // RTI
-        case 0x40: return cpu_instruction(RTI, ADM_IMPLIED);
+        case 0x40: cycles += 6; return cpu_instruction(RTI, ADM_IMPLIED);
         // CLC
-        case 0x18: return cpu_instruction(CLC, ADM_IMPLIED);
+        case 0x18: cycles += 2; return cpu_instruction(CLC, ADM_IMPLIED);
         // SEC
-        case 0x38: return cpu_instruction(SEC, ADM_IMPLIED);
+        case 0x38: cycles += 2; return cpu_instruction(SEC, ADM_IMPLIED);
         // CLD
-        case 0xD8: return cpu_instruction(CLD, ADM_IMPLIED);
+        case 0xD8: cycles += 2; return cpu_instruction(CLD, ADM_IMPLIED);
         // SED
-        case 0xF8: return cpu_instruction(SED, ADM_IMPLIED);
+        case 0xF8: cycles += 2; return cpu_instruction(SED, ADM_IMPLIED);
         // CLI
-        case 0x58: return cpu_instruction(CLI, ADM_IMPLIED);
+        case 0x58: cycles += 2; return cpu_instruction(CLI, ADM_IMPLIED);
         // SEI
-        case 0x78: return cpu_instruction(SEI, ADM_IMPLIED);
+        case 0x78: cycles += 2; return cpu_instruction(SEI, ADM_IMPLIED);
         // CLV
-        case 0xB8: return cpu_instruction(CLV, ADM_IMPLIED);
+        case 0xB8: cycles += 2; return cpu_instruction(CLV, ADM_IMPLIED);
         // BRK
-        case 0x00: return cpu_instruction(BRK, ADM_IMPLIED);
+        case 0x00: cycles += 7; return cpu_instruction(BRK, ADM_IMPLIED);
         // NOP
-        case 0xEA: return cpu_instruction(NOP, ADM_IMPLIED);
+        case 0xEA: cycles += 2; return cpu_instruction(NOP, ADM_IMPLIED);
         // (ILLEGAL) ALR
-        case 0x4B: return cpu_instruction(IL_ALR, ADM_IMMEDIATE);
+        case 0x4B: cycles += 2; return cpu_instruction(IL_ALR, ADM_IMMEDIATE);
         // (ILLEGAL) ANC
-        case 0x0B: return cpu_instruction(IL_ANC, ADM_IMMEDIATE);
-        case 0x2B: return cpu_instruction(IL_ANC, ADM_IMMEDIATE);
+        case 0x0B: cycles += 2; return cpu_instruction(IL_ANC, ADM_IMMEDIATE);
+        case 0x2B: cycles += 2; return cpu_instruction(IL_ANC, ADM_IMMEDIATE);
         // (ILLEGAL) ANE
-        case 0x8B: return cpu_instruction(IL_ANE, ADM_IMMEDIATE);
+        case 0x8B: cycles += 2; return cpu_instruction(IL_ANE, ADM_IMMEDIATE);
         // (ILLEGAL) ARR
-        case 0x6B: return cpu_instruction(IL_ARR, ADM_IMMEDIATE);
+        case 0x6B: cycles += 2; return cpu_instruction(IL_ARR, ADM_IMMEDIATE);
         // (ILLEGAL) DCP
-        case 0xC7: return cpu_instruction(IL_DCP, ADM_ZEROPAGE);
-        case 0xD7: return cpu_instruction(IL_DCP, ADM_ZP_X);
-        case 0xCF: return cpu_instruction(IL_DCP, ADM_ABSOLUTE);
-        case 0xDF: return cpu_instruction(IL_DCP, ADM_ABS_X);
-        case 0xDB: return cpu_instruction(IL_DCP, ADM_ABS_Y);
-        case 0xC3: return cpu_instruction(IL_DCP, ADM_ZP_INDIRECT_X);
-        case 0xD3: return cpu_instruction(IL_DCP, ADM_ZP_INDIRECT_Y);
+        case 0xC7: cycles += 5; return cpu_instruction(IL_DCP, ADM_ZEROPAGE);
+        case 0xD7: cycles += 6; return cpu_instruction(IL_DCP, ADM_ZP_X);
+        case 0xCF: cycles += 6; return cpu_instruction(IL_DCP, ADM_ABSOLUTE);
+        case 0xDF: cycles += 7; return cpu_instruction(IL_DCP, ADM_ABS_X);
+        case 0xDB: cycles += 7; return cpu_instruction(IL_DCP, ADM_ABS_Y);
+        case 0xC3: cycles += 8; return cpu_instruction(IL_DCP, ADM_ZP_INDIRECT_X);
+        case 0xD3: cycles += 8; return cpu_instruction(IL_DCP, ADM_ZP_INDIRECT_Y);
         // (ILLEGAL) ISC
-        case 0xE7: return cpu_instruction(IL_ISC, ADM_ZEROPAGE);
-        case 0xF7: return cpu_instruction(IL_ISC, ADM_ZP_X);
-        case 0xEF: return cpu_instruction(IL_ISC, ADM_ABSOLUTE);
-        case 0xFF: return cpu_instruction(IL_ISC, ADM_ABS_X);
-        case 0xFB: return cpu_instruction(IL_ISC, ADM_ABS_Y);
-        case 0xE3: return cpu_instruction(IL_ISC, ADM_ZP_INDIRECT_X);
-        case 0xF3: return cpu_instruction(IL_ISC, ADM_ZP_INDIRECT_Y);
+        case 0xE7: cycles += 5; return cpu_instruction(IL_ISC, ADM_ZEROPAGE);
+        case 0xF7: cycles += 6; return cpu_instruction(IL_ISC, ADM_ZP_X);
+        case 0xEF: cycles += 6; return cpu_instruction(IL_ISC, ADM_ABSOLUTE);
+        case 0xFF: cycles += 7; return cpu_instruction(IL_ISC, ADM_ABS_X);
+        case 0xFB: cycles += 7; return cpu_instruction(IL_ISC, ADM_ABS_Y);
+        case 0xE3: cycles += 8; return cpu_instruction(IL_ISC, ADM_ZP_INDIRECT_X);
+        case 0xF3: cycles += 4; return cpu_instruction(IL_ISC, ADM_ZP_INDIRECT_Y);
         // (ILLEGAL) LAS
-        case 0xBB: return cpu_instruction(IL_LAS, ADM_ABS_Y);
+        case 0xBB: cycles += 4; return cpu_instruction(IL_LAS, ADM_ABS_Y);
         // (ILLEGAL) LAX
-        case 0xA7: return cpu_instruction(IL_LAX, ADM_ZEROPAGE);
-        case 0xB7: return cpu_instruction(IL_LAX, ADM_ZP_Y);
-        case 0xAF: return cpu_instruction(IL_LAX, ADM_ABSOLUTE);
-        case 0xBF: return cpu_instruction(IL_LAX, ADM_ABS_Y);
-        case 0xA3: return cpu_instruction(IL_LAX, ADM_ZP_INDIRECT_X);
-        case 0xB3: return cpu_instruction(IL_LAX, ADM_ZP_INDIRECT_Y);
+        case 0xA7: cycles += 3; return cpu_instruction(IL_LAX, ADM_ZEROPAGE);
+        case 0xB7: cycles += 4; return cpu_instruction(IL_LAX, ADM_ZP_Y);
+        case 0xAF: cycles += 4; return cpu_instruction(IL_LAX, ADM_ABSOLUTE);
+        case 0xBF: cycles += 4; return cpu_instruction(IL_LAX, ADM_ABS_Y);
+        case 0xA3: cycles += 6; return cpu_instruction(IL_LAX, ADM_ZP_INDIRECT_X);
+        case 0xB3: cycles += 5; return cpu_instruction(IL_LAX, ADM_ZP_INDIRECT_Y);
         // (ILLEGAL) LXA
-        case 0xAB: return cpu_instruction(IL_LXA, ADM_IMMEDIATE);
+        case 0xAB: cycles += 2; return cpu_instruction(IL_LXA, ADM_IMMEDIATE);
         // (ILLEGAL) RLA
-        case 0x27: return cpu_instruction(IL_RLA, ADM_ZEROPAGE);
-        case 0x37: return cpu_instruction(IL_RLA, ADM_ZP_X);
-        case 0x2F: return cpu_instruction(IL_RLA, ADM_ABSOLUTE);
-        case 0x3F: return cpu_instruction(IL_RLA, ADM_ABS_X);
-        case 0x3B: return cpu_instruction(IL_RLA, ADM_ABS_Y);
-        case 0x23: return cpu_instruction(IL_RLA, ADM_ZP_INDIRECT_X);
-        case 0x33: return cpu_instruction(IL_RLA, ADM_ZP_INDIRECT_Y);
+        case 0x27: cycles += 5; return cpu_instruction(IL_RLA, ADM_ZEROPAGE);
+        case 0x37: cycles += 6; return cpu_instruction(IL_RLA, ADM_ZP_X);
+        case 0x2F: cycles += 6; return cpu_instruction(IL_RLA, ADM_ABSOLUTE);
+        case 0x3F: cycles += 7; return cpu_instruction(IL_RLA, ADM_ABS_X);
+        case 0x3B: cycles += 7; return cpu_instruction(IL_RLA, ADM_ABS_Y);
+        case 0x23: cycles += 8; return cpu_instruction(IL_RLA, ADM_ZP_INDIRECT_X);
+        case 0x33: cycles += 8; return cpu_instruction(IL_RLA, ADM_ZP_INDIRECT_Y);
         // (ILLEGAL) RRA
-        case 0x67: return cpu_instruction(IL_RRA, ADM_ZEROPAGE);
-        case 0x77: return cpu_instruction(IL_RRA, ADM_ZP_X);
-        case 0x6F: return cpu_instruction(IL_RRA, ADM_ABSOLUTE);
-        case 0x7F: return cpu_instruction(IL_RRA, ADM_ABS_X);
-        case 0x7B: return cpu_instruction(IL_RRA, ADM_ABS_Y);
-        case 0x63: return cpu_instruction(IL_RRA, ADM_ZP_INDIRECT_X);
-        case 0x73: return cpu_instruction(IL_RRA, ADM_ZP_INDIRECT_Y);
+        case 0x67: cycles += 5; return cpu_instruction(IL_RRA, ADM_ZEROPAGE);
+        case 0x77: cycles += 6; return cpu_instruction(IL_RRA, ADM_ZP_X);
+        case 0x6F: cycles += 6; return cpu_instruction(IL_RRA, ADM_ABSOLUTE);
+        case 0x7F: cycles += 7; return cpu_instruction(IL_RRA, ADM_ABS_X);
+        case 0x7B: cycles += 7; return cpu_instruction(IL_RRA, ADM_ABS_Y);
+        case 0x63: cycles += 8; return cpu_instruction(IL_RRA, ADM_ZP_INDIRECT_X);
+        case 0x73: cycles += 8; return cpu_instruction(IL_RRA, ADM_ZP_INDIRECT_Y);
         // (ILLEGAL) SAX
-        case 0x87: return cpu_instruction(IL_SAX, ADM_ZEROPAGE);
-        case 0x97: return cpu_instruction(IL_SAX, ADM_ZP_Y);
-        case 0x8F: return cpu_instruction(IL_SAX, ADM_ABSOLUTE);
-        case 0x83: return cpu_instruction(IL_SAX, ADM_ZP_INDIRECT_X);
+        case 0x87: cycles += 3; return cpu_instruction(IL_SAX, ADM_ZEROPAGE);
+        case 0x97: cycles += 4; return cpu_instruction(IL_SAX, ADM_ZP_Y);
+        case 0x8F: cycles += 4; return cpu_instruction(IL_SAX, ADM_ABSOLUTE);
+        case 0x83: cycles += 6; return cpu_instruction(IL_SAX, ADM_ZP_INDIRECT_X);
         // (ILLEGAL) SBX
-        case 0xCB: return cpu_instruction(IL_SBX, ADM_IMMEDIATE);
+        case 0xCB: cycles += 2; return cpu_instruction(IL_SBX, ADM_IMMEDIATE);
         // (ILLEGAL) SHA
-        case 0x9F: return cpu_instruction(IL_SHA, ADM_ABS_Y);
-        case 0x93: return cpu_instruction(IL_SHA, ADM_ZP_INDIRECT_Y);
+        case 0x9F: cycles += 5; return cpu_instruction(IL_SHA, ADM_ABS_Y);
+        case 0x93: cycles += 6; return cpu_instruction(IL_SHA, ADM_ZP_INDIRECT_Y);
         // (ILLEGAL) SHX
-        case 0x9E: return cpu_instruction(IL_SHX, ADM_ABS_Y);
+        case 0x9E: cycles += 5; return cpu_instruction(IL_SHX, ADM_ABS_Y);
         // (ILLEGAL) SHY
-        case 0x9C: return cpu_instruction(IL_SHY, ADM_ABS_Y);
+        case 0x9C: cycles += 5; return cpu_instruction(IL_SHY, ADM_ABS_Y);
         // (ILLEGAL) SLO
-        case 0x07: return cpu_instruction(IL_SLO, ADM_ZEROPAGE);
-        case 0x17: return cpu_instruction(IL_SLO, ADM_ZP_X);
-        case 0x0F: return cpu_instruction(IL_SLO, ADM_ABSOLUTE);
-        case 0x1F: return cpu_instruction(IL_SLO, ADM_ABS_X);
-        case 0x1B: return cpu_instruction(IL_SLO, ADM_ABS_Y);
-        case 0x03: return cpu_instruction(IL_SLO, ADM_ZP_INDIRECT_X);
-        case 0x13: return cpu_instruction(IL_SLO, ADM_ZP_INDIRECT_Y);
+        case 0x07: cycles += 5; return cpu_instruction(IL_SLO, ADM_ZEROPAGE);
+        case 0x17: cycles += 6; return cpu_instruction(IL_SLO, ADM_ZP_X);
+        case 0x0F: cycles += 6; return cpu_instruction(IL_SLO, ADM_ABSOLUTE);
+        case 0x1F: cycles += 7; return cpu_instruction(IL_SLO, ADM_ABS_X);
+        case 0x1B: cycles += 7; return cpu_instruction(IL_SLO, ADM_ABS_Y);
+        case 0x03: cycles += 8; return cpu_instruction(IL_SLO, ADM_ZP_INDIRECT_X);
+        case 0x13: cycles += 8; return cpu_instruction(IL_SLO, ADM_ZP_INDIRECT_Y);
         // (ILLEGAL) SRE
-        case 0x47: return cpu_instruction(IL_SRE, ADM_ZEROPAGE);
-        case 0x57: return cpu_instruction(IL_SRE, ADM_ZP_X);
-        case 0x4F: return cpu_instruction(IL_SRE, ADM_ABSOLUTE);
-        case 0x5F: return cpu_instruction(IL_SRE, ADM_ABS_X);
-        case 0x5B: return cpu_instruction(IL_SRE, ADM_ABS_Y);
-        case 0x43: return cpu_instruction(IL_SRE, ADM_ZP_INDIRECT_X);
-        case 0x53: return cpu_instruction(IL_SRE, ADM_ZP_INDIRECT_Y);
+        case 0x47: cycles += 5; return cpu_instruction(IL_SRE, ADM_ZEROPAGE);
+        case 0x57: cycles += 6; return cpu_instruction(IL_SRE, ADM_ZP_X);
+        case 0x4F: cycles += 6; return cpu_instruction(IL_SRE, ADM_ABSOLUTE);
+        case 0x5F: cycles += 7; return cpu_instruction(IL_SRE, ADM_ABS_X);
+        case 0x5B: cycles += 7; return cpu_instruction(IL_SRE, ADM_ABS_Y);
+        case 0x43: cycles += 8; return cpu_instruction(IL_SRE, ADM_ZP_INDIRECT_X);
+        case 0x53: cycles += 8; return cpu_instruction(IL_SRE, ADM_ZP_INDIRECT_Y);
         // (ILLEGAL) TAS
-        case 0x9B: return cpu_instruction(IL_TAS, ADM_ABS_Y);
+        case 0x9B: cycles += 5; return cpu_instruction(IL_TAS, ADM_ABS_Y);
         // (ILLEGAL) SBC
-        case 0xEB: return cpu_instruction(IL_SBC, ADM_IMMEDIATE);
+        case 0xEB: cycles += 2; return cpu_instruction(IL_SBC, ADM_IMMEDIATE);
         // (ILLEGAL) NOP
-        case 0x1A: return cpu_instruction(IL_NOP, ADM_IMPLIED);
-        case 0x3A: return cpu_instruction(IL_NOP, ADM_IMPLIED);
-        case 0x5A: return cpu_instruction(IL_NOP, ADM_IMPLIED);
-        case 0x7A: return cpu_instruction(IL_NOP, ADM_IMPLIED);
-        case 0xDA: return cpu_instruction(IL_NOP, ADM_IMPLIED);
-        case 0xFA: return cpu_instruction(IL_NOP, ADM_IMPLIED);
-        case 0x80: return cpu_instruction(IL_NOP, ADM_IMMEDIATE);
-        case 0x82: return cpu_instruction(IL_NOP, ADM_IMMEDIATE);
-        case 0xC2: return cpu_instruction(IL_NOP, ADM_IMMEDIATE);
-        case 0xE2: return cpu_instruction(IL_NOP, ADM_IMMEDIATE);
-        case 0x04: return cpu_instruction(IL_NOP, ADM_ZEROPAGE);
-        case 0x44: return cpu_instruction(IL_NOP, ADM_ZEROPAGE);
-        case 0x64: return cpu_instruction(IL_NOP, ADM_ZEROPAGE);
-        case 0x14: return cpu_instruction(IL_NOP, ADM_ZP_X);
-        case 0x34: return cpu_instruction(IL_NOP, ADM_ZP_X);
-        case 0x54: return cpu_instruction(IL_NOP, ADM_ZP_X);
-        case 0x74: return cpu_instruction(IL_NOP, ADM_ZP_X);
-        case 0xD4: return cpu_instruction(IL_NOP, ADM_ZP_X);
-        case 0xF4: return cpu_instruction(IL_NOP, ADM_ZP_X);
-        case 0x0C: return cpu_instruction(IL_NOP, ADM_ABSOLUTE);
-        case 0x1C: return cpu_instruction(IL_NOP, ADM_ABS_X);
-        case 0x3C: return cpu_instruction(IL_NOP, ADM_ABS_X);
-        case 0x5C: return cpu_instruction(IL_NOP, ADM_ABS_X);
-        case 0x7C: return cpu_instruction(IL_NOP, ADM_ABS_X);
-        case 0xDC: return cpu_instruction(IL_NOP, ADM_ABS_X);
-        case 0xFC: return cpu_instruction(IL_NOP, ADM_ABS_X);
+        case 0x1A: cycles += 2; return cpu_instruction(IL_NOP, ADM_IMPLIED);
+        case 0x3A: cycles += 2; return cpu_instruction(IL_NOP, ADM_IMPLIED);
+        case 0x5A: cycles += 2; return cpu_instruction(IL_NOP, ADM_IMPLIED);
+        case 0x7A: cycles += 2; return cpu_instruction(IL_NOP, ADM_IMPLIED);
+        case 0xDA: cycles += 2; return cpu_instruction(IL_NOP, ADM_IMPLIED);
+        case 0xFA: cycles += 2; return cpu_instruction(IL_NOP, ADM_IMPLIED);
+        case 0x80: cycles += 2; return cpu_instruction(IL_NOP, ADM_IMMEDIATE);
+        case 0x82: cycles += 2; return cpu_instruction(IL_NOP, ADM_IMMEDIATE);
+        case 0xC2: cycles += 2; return cpu_instruction(IL_NOP, ADM_IMMEDIATE);
+        case 0xE2: cycles += 2; return cpu_instruction(IL_NOP, ADM_IMMEDIATE);
+        case 0x04: cycles += 3; return cpu_instruction(IL_NOP, ADM_ZEROPAGE);
+        case 0x44: cycles += 3; return cpu_instruction(IL_NOP, ADM_ZEROPAGE);
+        case 0x64: cycles += 3; return cpu_instruction(IL_NOP, ADM_ZEROPAGE);
+        case 0x14: cycles += 4; return cpu_instruction(IL_NOP, ADM_ZP_X);
+        case 0x34: cycles += 4; return cpu_instruction(IL_NOP, ADM_ZP_X);
+        case 0x54: cycles += 4; return cpu_instruction(IL_NOP, ADM_ZP_X);
+        case 0x74: cycles += 4; return cpu_instruction(IL_NOP, ADM_ZP_X);
+        case 0xD4: cycles += 4; return cpu_instruction(IL_NOP, ADM_ZP_X);
+        case 0xF4: cycles += 4; return cpu_instruction(IL_NOP, ADM_ZP_X);
+        case 0x0C: cycles += 4; return cpu_instruction(IL_NOP, ADM_ABSOLUTE);
+        case 0x1C: cycles += 4; return cpu_instruction(IL_NOP, ADM_ABS_X);
+        case 0x3C: cycles += 4; return cpu_instruction(IL_NOP, ADM_ABS_X);
+        case 0x5C: cycles += 4; return cpu_instruction(IL_NOP, ADM_ABS_X);
+        case 0x7C: cycles += 4; return cpu_instruction(IL_NOP, ADM_ABS_X);
+        case 0xDC: cycles += 4; return cpu_instruction(IL_NOP, ADM_ABS_X);
+        case 0xFC: cycles += 4; return cpu_instruction(IL_NOP, ADM_ABS_X);
         // JAM
         case 0x02: return cpu_instruction(IL_JAM, ADM_IMPLIED);
         case 0x12: return cpu_instruction(IL_JAM, ADM_IMPLIED);
@@ -872,7 +895,7 @@ uint8_t cpu_execute() {
 
 uint8_t cpu_lda(uint16_t address) {
     reg_accumulator = bus_readCPU(address);
-    cycles += 1;
+    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return LDA;
@@ -894,25 +917,25 @@ uint8_t cpu_ldy(uint16_t address) {
 
 uint8_t cpu_sta(uint16_t address) {
     bus_writeCPU(address, reg_accumulator);
-    cycles += 1;
+    // cycles += 1;
     return STA;
 }
 
 uint8_t cpu_stx(uint16_t address) {
     bus_writeCPU(address, reg_x);
-    cycles += 1;
+    // cycles += 1;
     return STX;
 }
 
 uint8_t cpu_sty(uint16_t address) {
     bus_writeCPU(address, reg_y);
-    cycles += 1;
+    // cycles += 1;
     return STY;
 }
 
 uint8_t cpu_adc(uint16_t address) {
     uint8_t memoryVal = bus_readCPU(address);
-    cycles += 1;
+    // cycles += 1;
 
     uint16_t sum = reg_accumulator + memoryVal + ((uint16_t) cpu_getFlag(CPUSTAT_CARRY));
 
@@ -927,7 +950,7 @@ uint8_t cpu_adc(uint16_t address) {
 
 uint8_t cpu_sbc(uint16_t address) {
     uint8_t memoryVal = ~bus_readCPU(address);
-    cycles += 1;
+    // cycles += 1;
 
     uint16_t sum = reg_accumulator + memoryVal + ((uint16_t) cpu_getFlag(CPUSTAT_CARRY));
 
@@ -943,7 +966,7 @@ uint8_t cpu_sbc(uint16_t address) {
 uint8_t cpu_inc(uint16_t address) {
     uint8_t val = bus_readCPU(address) + 1;
     bus_writeCPU(address, val);
-    cycles += 2;
+    // cycles += 2;
 
     cpu_setFlag(CPUSTAT_ZERO, val == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (val & 0b10000000) != 0);
@@ -952,7 +975,7 @@ uint8_t cpu_inc(uint16_t address) {
 
 uint8_t cpu_inx() {
     reg_x += 1;
-    cycles += 1;
+    // cycles += 1;
 
     cpu_setFlag(CPUSTAT_ZERO, reg_x == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_x & 0b10000000) != 0);
@@ -961,7 +984,7 @@ uint8_t cpu_inx() {
 
 uint8_t cpu_iny() {
     reg_y += 1;
-    cycles += 1;
+    // cycles += 1;
 
     cpu_setFlag(CPUSTAT_ZERO, reg_y == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_y & 0b10000000) != 0);
@@ -971,7 +994,7 @@ uint8_t cpu_iny() {
 uint8_t cpu_dec(uint16_t address) {
     uint8_t val = bus_readCPU(address) - 1;
     bus_writeCPU(address, val);
-    cycles += 1;
+    // cycles += 1;
 
     cpu_setFlag(CPUSTAT_ZERO, val == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (val & 0b10000000) != 0);
@@ -981,7 +1004,7 @@ uint8_t cpu_dec(uint16_t address) {
 uint8_t cpu_dex() {
     reg_x -= 1;
 
-    cycles += 1;
+    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_x == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_x & 0b10000000) != 0);
     return DEX;
@@ -990,7 +1013,7 @@ uint8_t cpu_dex() {
 uint8_t cpu_dey() {
     reg_y -= 1;
 
-    cycles += 1;
+    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_y == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_y & 0b10000000) != 0);
     return DEY;
@@ -1001,7 +1024,7 @@ uint8_t cpu_asl(uint16_t address) {
     if (!accumulatorAddrMode) {
         storedVal = bus_readCPU(address);
     }
-    cycles += 1;
+    // cycles += 1;
 
     cpu_setFlag(CPUSTAT_CARRY, (storedVal >> 7) & 1);
     storedVal = storedVal << 1;
@@ -1013,7 +1036,7 @@ uint8_t cpu_asl(uint16_t address) {
         reg_accumulator = storedVal;
     } else {
         bus_writeCPU(address, storedVal);
-        cycles += 1;
+        // cycles += 1;
     }
 
     accumulatorAddrMode = false;
@@ -1025,7 +1048,7 @@ uint8_t cpu_lsr(uint16_t address) {
     if (!accumulatorAddrMode) {
         storedVal = bus_readCPU(address);
     }
-    cycles += 1;
+    // cycles += 1;
 
     cpu_setFlag(CPUSTAT_CARRY, storedVal & 1);
     storedVal = storedVal >> 1;
@@ -1037,7 +1060,7 @@ uint8_t cpu_lsr(uint16_t address) {
         reg_accumulator = storedVal;
     } else {
         bus_writeCPU(address, storedVal);
-        cycles += 1;
+        // cycles += 1;
     }
 
     accumulatorAddrMode = false;
@@ -1049,7 +1072,7 @@ uint8_t cpu_rol(uint16_t address) {
     if (!accumulatorAddrMode) {
         storedVal = bus_readCPU(address);
     }
-    cycles += 1;
+    // cycles += 1;
 
     bool oldCarry = cpu_getFlag(CPUSTAT_CARRY);
     cpu_setFlag(CPUSTAT_CARRY, (storedVal >> 7) & 1);
@@ -1063,7 +1086,7 @@ uint8_t cpu_rol(uint16_t address) {
         reg_accumulator = storedVal;
     } else {
         bus_writeCPU(address, storedVal);
-        cycles += 1;
+        // cycles += 1;
     }
 
     accumulatorAddrMode = false;
@@ -1075,7 +1098,7 @@ uint8_t cpu_ror(uint16_t address) {
     if (!accumulatorAddrMode) {
         storedVal = bus_readCPU(address);
     }
-    cycles += 1;
+    // cycles += 1;
 
     bool oldCarry = cpu_getFlag(CPUSTAT_CARRY);
     cpu_setFlag(CPUSTAT_CARRY, storedVal & 1);
@@ -1089,7 +1112,7 @@ uint8_t cpu_ror(uint16_t address) {
         reg_accumulator = storedVal;
     } else {
         bus_writeCPU(address, storedVal);
-        cycles += 1;
+        // cycles += 1;
     }
 
     accumulatorAddrMode = false;
@@ -1098,7 +1121,7 @@ uint8_t cpu_ror(uint16_t address) {
 
 uint8_t cpu_and(uint16_t address) {
     reg_accumulator = bus_readCPU(address) & reg_accumulator;
-    cycles += 1;
+    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return AND;
@@ -1106,7 +1129,7 @@ uint8_t cpu_and(uint16_t address) {
 
 uint8_t cpu_ora(uint16_t address) {
     reg_accumulator = bus_readCPU(address) | reg_accumulator;
-    cycles += 1;
+    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return ORA;
@@ -1114,7 +1137,7 @@ uint8_t cpu_ora(uint16_t address) {
 
 uint8_t cpu_eor(uint16_t address) {
     reg_accumulator = bus_readCPU(address) ^ reg_accumulator;
-    cycles += 1;
+    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return EOR;
@@ -1122,7 +1145,7 @@ uint8_t cpu_eor(uint16_t address) {
 
 uint8_t cpu_cmp(uint16_t address) {
     uint8_t memVal = bus_readCPU(address);
-    cycles += 1;
+    // cycles += 1;
 
     int8_t signedResult = ((int8_t) reg_accumulator) - ((int8_t) memVal);
     if (reg_accumulator < memVal) {
@@ -1142,7 +1165,7 @@ uint8_t cpu_cmp(uint16_t address) {
 
 uint8_t cpu_cpx(uint16_t address) {
     uint8_t memVal = bus_readCPU(address);
-    cycles += 1;
+    // cycles += 1;
 
     int8_t signedResult = ((int8_t) reg_x) - ((int8_t) memVal);
     if (reg_x < memVal) {
@@ -1162,7 +1185,7 @@ uint8_t cpu_cpx(uint16_t address) {
 
 uint8_t cpu_cpy(uint16_t address) {
     uint8_t memVal = bus_readCPU(address);
-    cycles += 1;
+    // cycles += 1;
 
     int8_t signedResult = ((int8_t) reg_y) - ((int8_t) memVal);
     if (reg_y < memVal) {
@@ -1182,8 +1205,6 @@ uint8_t cpu_cpy(uint16_t address) {
 
 uint8_t cpu_bit(uint16_t address) {
     uint8_t memVal = bus_readCPU(address);
-    cycles += 1;
-
     cpu_setFlag(CPUSTAT_ZERO, (reg_accumulator & memVal) == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (memVal & 0b10000000) != 0);
     cpu_setFlag(CPUSTAT_OVERFLOW, (memVal & 0b01000000) != 0);
@@ -1193,7 +1214,7 @@ uint8_t cpu_bit(uint16_t address) {
 void cpu_branchHelper(bool desiredResult, enum CPUStatusFlag flag) {
     if (cpu_getFlag(flag) == desiredResult) {
         int8_t offset = (bus_readCPU(reg_pc));
-        cycles += 2;
+        // cycles += 2;
         reg_pc += offset;
         reg_pc += 1;
     } else {
@@ -1243,7 +1264,7 @@ uint8_t cpu_bvs() {
 
 uint8_t cpu_tax() {
     reg_x = reg_accumulator;
-    cycles += 1;
+    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_x == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_x & 0b10000000) != 0);
     return TAX;
@@ -1251,7 +1272,7 @@ uint8_t cpu_tax() {
 
 uint8_t cpu_txa() {
     reg_accumulator = reg_x;
-    cycles += 1;
+    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return TXA;
@@ -1259,7 +1280,7 @@ uint8_t cpu_txa() {
 
 uint8_t cpu_tay() {
     reg_y = reg_accumulator;
-    cycles += 1;
+    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_y == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_y & 0b10000000) != 0);
     return TAY;
@@ -1267,7 +1288,7 @@ uint8_t cpu_tay() {
 
 uint8_t cpu_tya() {
     reg_accumulator = reg_y;
-    cycles += 1;
+    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return TYA;
@@ -1275,7 +1296,7 @@ uint8_t cpu_tya() {
 
 uint8_t cpu_tsx() {
     reg_x = stackPointer;
-    cycles += 1;
+    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_x == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_x & 0b10000000) != 0);
     return TSX;
@@ -1283,7 +1304,7 @@ uint8_t cpu_tsx() {
 
 uint8_t cpu_txs() {
     stackPointer = reg_x;
-    cycles += 1;
+    // cycles += 1;
     return TXS;
 }
 
@@ -1313,7 +1334,7 @@ uint8_t cpu_plp() {
 
 uint8_t cpu_jmp(uint16_t address) {
     reg_pc = address;
-    cycles += 2;
+    // cycles += 2;
     return JMP;
 }
 
@@ -1322,13 +1343,13 @@ uint8_t cpu_jsr(uint16_t address) {
     uint16_t returnAddress = reg_pc - 1;
     reg_pc = address;
     cpu_stackPush16(returnAddress);
-    cycles += 2;
+    // cycles += 2;
     return JSR;
 }
 
 uint8_t cpu_rts() {
     reg_pc = cpu_stackPull16() + 1;
-    cycles += 1;
+    // cycles += 1;
     return RTS;
 }
 
@@ -1336,49 +1357,49 @@ uint8_t cpu_rti() {
     reg_status = cpu_stackPull();
     reg_pc = cpu_stackPull16();
     cpu_setFlag(CPUSTAT_BREAK2, true); // always ensure BREAK2 is set
-    cycles += 1;
+    // cycles += 1;
     return RTI;
 }
 
 uint8_t cpu_clc() {
     cpu_setFlag(CPUSTAT_CARRY, 0);
-    cycles += 1;
+    // cycles += 1;
     return CLC;
 }
 
 uint8_t cpu_sec() {
     cpu_setFlag(CPUSTAT_CARRY, 1);
-    cycles += 1;
+    // cycles += 1;
     return SEC;
 }
 
 uint8_t cpu_cld() {
     cpu_setFlag(CPUSTAT_DECIMAL, 0);
-    cycles += 1;
+    // cycles += 1;
     return CLD;
 }
 
 uint8_t cpu_sed() {
     cpu_setFlag(CPUSTAT_DECIMAL, 1);
-    cycles += 1;
+    // cycles += 1;
     return SED;
 }
 
 uint8_t cpu_cli() {
     cpu_setFlag(CPUSTAT_NO_INTRPT, 0);
-    cycles += 1;
+    // cycles += 1;
     return CLI;
 }
 
 uint8_t cpu_sei() {
     cpu_setFlag(CPUSTAT_NO_INTRPT, 1);
-    cycles += 1;
+    // cycles += 1;
     return SEI;
 }
 
 uint8_t cpu_clv() {
     cpu_setFlag(CPUSTAT_OVERFLOW, 0);
-    cycles += 1;
+    // cycles += 1;
     return CLV;
 }
 
@@ -1389,7 +1410,7 @@ uint8_t cpu_brk() {
 }
 
 uint8_t cpu_nop() {
-    cycles += 1;
+    // cycles += 1;
     return NOP;
 }
 
@@ -1444,7 +1465,7 @@ uint8_t cpu_illegal_lax(uint16_t address) {
 uint8_t cpu_illegal_lxa(uint16_t address) {
     reg_accumulator = (rand() % 256) & bus_readCPU(address);
     reg_x = reg_accumulator;
-    cycles += 1;
+    // cycles += 1;
     return IL_LXA;
 }
 
@@ -1462,14 +1483,14 @@ uint8_t cpu_illegal_rra(uint16_t address) {
 
 uint8_t cpu_illegal_sax(uint16_t address) {
     bus_writeCPU(address, reg_accumulator & reg_x);
-    cycles += 1;
+    // cycles += 1;
     return IL_SAX;
 }
 
 uint8_t cpu_illegal_sbx(uint16_t address) {
     uint8_t memVal = bus_readCPU(address);
     uint8_t cmpVal = reg_accumulator & reg_x;
-    cycles += 1;
+    // cycles += 1;
 
     int8_t signedResult = ((int8_t) cmpVal) - ((int8_t) memVal);
     if (cmpVal < memVal) {
@@ -1494,7 +1515,7 @@ uint8_t cpu_illegal_sha(uint16_t address) {
     } else {
         bus_writeCPU(address, reg_accumulator & reg_x & ((bus_readCPU(address) >> 8) + 1));
     }
-    cycles += 1;
+    // cycles += 1;
     return IL_SHA;
 }
 
@@ -1505,7 +1526,7 @@ uint8_t cpu_illegal_shx(uint16_t address) {
     } else {
         bus_writeCPU(address, reg_x & ((bus_readCPU(address) >> 8) + 1));
     }
-    cycles += 1;
+    // cycles += 1;
     return IL_SHX;
 }
 
@@ -1516,7 +1537,7 @@ uint8_t cpu_illegal_shy(uint16_t address) {
     } else {
         bus_writeCPU(address, reg_y & ((bus_readCPU(address) >> 8) + 1));
     }
-    cycles += 1;
+    // cycles += 1;
     return IL_SHY;
 }
 
@@ -1540,7 +1561,7 @@ uint8_t cpu_illegal_tas(uint16_t address) {
     } else {
         bus_writeCPU(address, reg_accumulator & reg_x & ((bus_readCPU(address) >> 8) + 1));
     }
-    cycles += 1;
+    // cycles += 1;
     return IL_TAS;
 }
 
@@ -1555,7 +1576,7 @@ uint8_t cpu_illegal_jam() {
 }
 
 uint8_t cpu_illegal_nop(uint16_t address) {
-    cycles += 1;
+    // cycles += 1;
     return IL_NOP;
 }
 
