@@ -1,3 +1,7 @@
+### Important!
+
+This port is _not_ being actively worked on.
+
 # NES Emulator for TI-84 CE
 
 This is a crude port of my NES emulator to the TI-84 CE, mainly done out of curiosity. It does actually manage to run, thanks to the [CE C/C++ Toolchain](https://ce-programming.github.io/toolchain/). However, it runs at approximately 20 seconds per frame (0.05 FPS!), thus making it nowhere near playable.

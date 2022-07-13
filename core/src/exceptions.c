@@ -27,8 +27,8 @@
 FILE* fp;
 
 void exc_traceInit() {
-    fp = fopen("output.log", "w");
-    fp = fopen("output.log", "a");
+    fp = fopen("./debug/output.log", "w");
+    fp = fopen("./debug/output.log", "a");
 }
 
 void exc_panic(char* message) {

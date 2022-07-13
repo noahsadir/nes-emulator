@@ -8,7 +8,7 @@ I mostly wrote this for fun, and it certainly isn't near feature complete.
 
 #### Another Note
 
-The details below pertain to the x86 emulator. I may attempt to port it to the TI-84 CE, but it may not be feasible due to the hardware limitations and the sheer number of optimizations which need to be done.
+The details below pertain to the core emulator. The Z80 port was done out of sheer curiosity and is not being actively worked on.
 
 #### Dependencies
 - SDL2

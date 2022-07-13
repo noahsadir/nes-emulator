@@ -35,7 +35,7 @@ uint32_t cycles = 4;
 
 bool accumulatorAddrMode = false;
 bool didPanic = false;
-bool generateTrace = false;
+bool generateTrace = true;
 
 void cpu_init() {
     cpu_reset();
