@@ -86,21 +86,17 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
         }
         case ADM_ABSOLUTE:
         {
-            uint16_t address = bus_readCPU(reg_pc); // cycle
+            uint16_t address = bus_readCPU(reg_pc);
             reg_pc += 1;
-            address = (((uint16_t) bus_readCPU(reg_pc)) << 8) | address; // cycle
+            address = (((uint16_t) bus_readCPU(reg_pc)) << 8) | address;
             reg_pc += 1;
-
-            // cycles += 2;
             return address;
         }
         case ADM_ZEROPAGE:
         {
-            uint16_t address = bus_readCPU(reg_pc); // cycle
+            uint16_t address = bus_readCPU(reg_pc);
             reg_pc += 1;
             address %= 256;
-
-            // cycles += 1;
             return address;
         }
         case ADM_RELATIVE:
@@ -109,94 +105,82 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
         }
         case ADM_ABS_INDIRECT:
         {
-            uint16_t initlow = bus_readCPU(reg_pc); // cycle
+            uint16_t initlow = bus_readCPU(reg_pc);
             reg_pc += 1;
-            uint16_t inithigh = bus_readCPU(reg_pc); // cycle
+            uint16_t inithigh = bus_readCPU(reg_pc);
             reg_pc += 1;
             inithigh = inithigh << 8;
 
             uint16_t low = (inithigh | initlow);
             uint16_t high = (inithigh | ((initlow + 1) % 256));
-            low = bus_readCPU(low); // cycle
-            high = bus_readCPU(high); // cycle
+            low = bus_readCPU(low);
+            high = bus_readCPU(high);
             high = high << 8;
             uint16_t address = (high | low);
-
-            // cycles += 4;
             return address;
         }
         case ADM_ABS_X:
         {
-            uint16_t address = bus_readCPU(reg_pc); // cycle
+            uint16_t address = bus_readCPU(reg_pc);
             reg_pc += 1;
-            address = (bus_readCPU(reg_pc) << 8) | address; // cycle
+            address = (bus_readCPU(reg_pc) << 8) | address;
             reg_pc += 1;
             address += reg_x;
-            
-            // cycles += 3;
             return address;
         }
         case ADM_ABS_Y:
         {
-            uint16_t address = bus_readCPU(reg_pc); // cycle
+            uint16_t address = bus_readCPU(reg_pc);
             reg_pc += 1;
-            address = (bus_readCPU(reg_pc) << 8) | address; // cycle
+            address = (bus_readCPU(reg_pc) << 8) | address;
             reg_pc += 1;
-            address += reg_y; // cycle
-
-            // cycles += 3;
+            address += reg_y;
             return address;
         }
         case ADM_ZP_X:
         {
-            uint16_t address = bus_readCPU(reg_pc); // cycle
+            uint16_t address = bus_readCPU(reg_pc);
             reg_pc += 1;
-            address += reg_x; // cycle
+            address += reg_x;
             address %= 256;
-
-            // cycles += 2;
             return address;
         }
         case ADM_ZP_Y:
         {
-            uint16_t address = bus_readCPU(reg_pc); // cycle
+            uint16_t address = bus_readCPU(reg_pc);
             reg_pc += 1;
-            address += reg_y; // cycle
+            address += reg_y;
             address %= 256;
-
-            // cycles += 2;
             return address;
         }
         case ADM_ZP_INDIRECT_X:
         {
-            uint16_t address = bus_readCPU(reg_pc); // cycle
+            uint16_t address = bus_readCPU(reg_pc);
             reg_pc += 1;
-            address += reg_x; // cycle
+            address += reg_x;
             address %= 256;
 
-            uint16_t low = bus_readCPU(address); // cycle
-            uint16_t high = bus_readCPU((address + 1) % 256); // cycle
+            uint16_t low = bus_readCPU(address);
+            uint16_t high = bus_readCPU((address + 1) % 256);
 
             high = high << 8;
             address = (high | low);
 
-            // cycles += 4;
             return address;
 
         }
         case ADM_ZP_INDIRECT_Y:
         {
-            uint16_t address = bus_readCPU(reg_pc); // cycle
+            uint16_t address = bus_readCPU(reg_pc);
             reg_pc += 1;
 
-            uint16_t low = bus_readCPU(address); // cycle
-            uint16_t high = bus_readCPU((address + 1) % 256); // cycle
+            uint16_t low = bus_readCPU(address);
+            uint16_t high = bus_readCPU((address + 1) % 256);
 
             high = high << 8;
             address = (high | low);
-            address += reg_y; // cycle
+            address += reg_y;
 
-            // cycles += 4;
             return address;
 
         }
@@ -222,7 +206,6 @@ void cpu_reset() {
     reg_y = 0;
     reg_status = 0x24;
     reg_pc = bus_readCPUAddr(0xFFFC);
-
     stackPointer = 0xFD;
 }
 
@@ -232,7 +215,6 @@ void cpu_stackPush(uint8_t val) {
     } else {
         bus_writeCPU(0x100 + stackPointer, val);
         stackPointer -= 1;
-        // cycles += 1;
     }
 }
 
@@ -242,7 +224,6 @@ uint8_t cpu_stackPull() {
     } else {
         stackPointer += 1;
         uint8_t val = bus_readCPU(0x100 + stackPointer);
-        // cycles += 2;
         return val;
     }
     return 0;
@@ -254,15 +235,10 @@ void cpu_stackPush16(uint16_t val) {
     } else {
         uint8_t high = (val >> 8) & 0x00FF;
         uint8_t low = (val >> 0) & 0x00FF;
-
         bus_writeCPU(0x100 + stackPointer, high);
         stackPointer -= 1;
         bus_writeCPU(0x100 + stackPointer, low);
         stackPointer -= 1;
-
-        
-
-        // cycles += 2;
     }
 }
 
@@ -276,8 +252,6 @@ uint16_t cpu_stackPull16() {
 
         stackPointer += 1;
         uint8_t high = bus_readCPU(0x100 + stackPointer);
-
-        // cycles += 4;
 
         uint16_t addr = (((uint16_t) high) << 8) | ((uint16_t) low);
 
@@ -546,7 +520,6 @@ uint8_t cpu_execute() {
 
     uint8_t opcode = bus_readCPU(reg_pc);
     reg_pc += 1;
-    // cycles += 1;
     
     switch (opcode) {
         // LDA
@@ -895,7 +868,6 @@ uint8_t cpu_execute() {
 
 uint8_t cpu_lda(uint16_t address) {
     reg_accumulator = bus_readCPU(address);
-    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return LDA;
@@ -917,25 +889,21 @@ uint8_t cpu_ldy(uint16_t address) {
 
 uint8_t cpu_sta(uint16_t address) {
     bus_writeCPU(address, reg_accumulator);
-    // cycles += 1;
     return STA;
 }
 
 uint8_t cpu_stx(uint16_t address) {
     bus_writeCPU(address, reg_x);
-    // cycles += 1;
     return STX;
 }
 
 uint8_t cpu_sty(uint16_t address) {
     bus_writeCPU(address, reg_y);
-    // cycles += 1;
     return STY;
 }
 
 uint8_t cpu_adc(uint16_t address) {
     uint8_t memoryVal = bus_readCPU(address);
-    // cycles += 1;
 
     uint16_t sum = reg_accumulator + memoryVal + ((uint16_t) cpu_getFlag(CPUSTAT_CARRY));
 
@@ -950,7 +918,6 @@ uint8_t cpu_adc(uint16_t address) {
 
 uint8_t cpu_sbc(uint16_t address) {
     uint8_t memoryVal = ~bus_readCPU(address);
-    // cycles += 1;
 
     uint16_t sum = reg_accumulator + memoryVal + ((uint16_t) cpu_getFlag(CPUSTAT_CARRY));
 
@@ -966,7 +933,6 @@ uint8_t cpu_sbc(uint16_t address) {
 uint8_t cpu_inc(uint16_t address) {
     uint8_t val = bus_readCPU(address) + 1;
     bus_writeCPU(address, val);
-    // cycles += 2;
 
     cpu_setFlag(CPUSTAT_ZERO, val == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (val & 0b10000000) != 0);
@@ -975,7 +941,6 @@ uint8_t cpu_inc(uint16_t address) {
 
 uint8_t cpu_inx() {
     reg_x += 1;
-    // cycles += 1;
 
     cpu_setFlag(CPUSTAT_ZERO, reg_x == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_x & 0b10000000) != 0);
@@ -984,7 +949,6 @@ uint8_t cpu_inx() {
 
 uint8_t cpu_iny() {
     reg_y += 1;
-    // cycles += 1;
 
     cpu_setFlag(CPUSTAT_ZERO, reg_y == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_y & 0b10000000) != 0);
@@ -994,7 +958,7 @@ uint8_t cpu_iny() {
 uint8_t cpu_dec(uint16_t address) {
     uint8_t val = bus_readCPU(address) - 1;
     bus_writeCPU(address, val);
-    // cycles += 1;
+    
 
     cpu_setFlag(CPUSTAT_ZERO, val == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (val & 0b10000000) != 0);
@@ -1004,7 +968,7 @@ uint8_t cpu_dec(uint16_t address) {
 uint8_t cpu_dex() {
     reg_x -= 1;
 
-    // cycles += 1;
+    
     cpu_setFlag(CPUSTAT_ZERO, reg_x == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_x & 0b10000000) != 0);
     return DEX;
@@ -1013,7 +977,6 @@ uint8_t cpu_dex() {
 uint8_t cpu_dey() {
     reg_y -= 1;
 
-    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_y == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_y & 0b10000000) != 0);
     return DEY;
@@ -1024,7 +987,6 @@ uint8_t cpu_asl(uint16_t address) {
     if (!accumulatorAddrMode) {
         storedVal = bus_readCPU(address);
     }
-    // cycles += 1;
 
     cpu_setFlag(CPUSTAT_CARRY, (storedVal >> 7) & 1);
     storedVal = storedVal << 1;
@@ -1036,7 +998,6 @@ uint8_t cpu_asl(uint16_t address) {
         reg_accumulator = storedVal;
     } else {
         bus_writeCPU(address, storedVal);
-        // cycles += 1;
     }
 
     accumulatorAddrMode = false;
@@ -1048,7 +1009,6 @@ uint8_t cpu_lsr(uint16_t address) {
     if (!accumulatorAddrMode) {
         storedVal = bus_readCPU(address);
     }
-    // cycles += 1;
 
     cpu_setFlag(CPUSTAT_CARRY, storedVal & 1);
     storedVal = storedVal >> 1;
@@ -1060,7 +1020,6 @@ uint8_t cpu_lsr(uint16_t address) {
         reg_accumulator = storedVal;
     } else {
         bus_writeCPU(address, storedVal);
-        // cycles += 1;
     }
 
     accumulatorAddrMode = false;
@@ -1072,7 +1031,7 @@ uint8_t cpu_rol(uint16_t address) {
     if (!accumulatorAddrMode) {
         storedVal = bus_readCPU(address);
     }
-    // cycles += 1;
+    
 
     bool oldCarry = cpu_getFlag(CPUSTAT_CARRY);
     cpu_setFlag(CPUSTAT_CARRY, (storedVal >> 7) & 1);
@@ -1086,7 +1045,6 @@ uint8_t cpu_rol(uint16_t address) {
         reg_accumulator = storedVal;
     } else {
         bus_writeCPU(address, storedVal);
-        // cycles += 1;
     }
 
     accumulatorAddrMode = false;
@@ -1098,7 +1056,6 @@ uint8_t cpu_ror(uint16_t address) {
     if (!accumulatorAddrMode) {
         storedVal = bus_readCPU(address);
     }
-    // cycles += 1;
 
     bool oldCarry = cpu_getFlag(CPUSTAT_CARRY);
     cpu_setFlag(CPUSTAT_CARRY, storedVal & 1);
@@ -1112,7 +1069,7 @@ uint8_t cpu_ror(uint16_t address) {
         reg_accumulator = storedVal;
     } else {
         bus_writeCPU(address, storedVal);
-        // cycles += 1;
+        
     }
 
     accumulatorAddrMode = false;
@@ -1121,7 +1078,6 @@ uint8_t cpu_ror(uint16_t address) {
 
 uint8_t cpu_and(uint16_t address) {
     reg_accumulator = bus_readCPU(address) & reg_accumulator;
-    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return AND;
@@ -1129,7 +1085,6 @@ uint8_t cpu_and(uint16_t address) {
 
 uint8_t cpu_ora(uint16_t address) {
     reg_accumulator = bus_readCPU(address) | reg_accumulator;
-    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return ORA;
@@ -1137,7 +1092,7 @@ uint8_t cpu_ora(uint16_t address) {
 
 uint8_t cpu_eor(uint16_t address) {
     reg_accumulator = bus_readCPU(address) ^ reg_accumulator;
-    // cycles += 1;
+    
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return EOR;
@@ -1145,7 +1100,6 @@ uint8_t cpu_eor(uint16_t address) {
 
 uint8_t cpu_cmp(uint16_t address) {
     uint8_t memVal = bus_readCPU(address);
-    // cycles += 1;
 
     int8_t signedResult = ((int8_t) reg_accumulator) - ((int8_t) memVal);
     if (reg_accumulator < memVal) {
@@ -1165,7 +1119,6 @@ uint8_t cpu_cmp(uint16_t address) {
 
 uint8_t cpu_cpx(uint16_t address) {
     uint8_t memVal = bus_readCPU(address);
-    // cycles += 1;
 
     int8_t signedResult = ((int8_t) reg_x) - ((int8_t) memVal);
     if (reg_x < memVal) {
@@ -1185,7 +1138,6 @@ uint8_t cpu_cpx(uint16_t address) {
 
 uint8_t cpu_cpy(uint16_t address) {
     uint8_t memVal = bus_readCPU(address);
-    // cycles += 1;
 
     int8_t signedResult = ((int8_t) reg_y) - ((int8_t) memVal);
     if (reg_y < memVal) {
@@ -1214,7 +1166,6 @@ uint8_t cpu_bit(uint16_t address) {
 void cpu_branchHelper(bool desiredResult, enum CPUStatusFlag flag) {
     if (cpu_getFlag(flag) == desiredResult) {
         int8_t offset = (bus_readCPU(reg_pc));
-        // cycles += 2;
         reg_pc += offset;
         reg_pc += 1;
     } else {
@@ -1264,7 +1215,6 @@ uint8_t cpu_bvs() {
 
 uint8_t cpu_tax() {
     reg_x = reg_accumulator;
-    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_x == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_x & 0b10000000) != 0);
     return TAX;
@@ -1272,7 +1222,6 @@ uint8_t cpu_tax() {
 
 uint8_t cpu_txa() {
     reg_accumulator = reg_x;
-    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return TXA;
@@ -1280,7 +1229,6 @@ uint8_t cpu_txa() {
 
 uint8_t cpu_tay() {
     reg_y = reg_accumulator;
-    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_y == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_y & 0b10000000) != 0);
     return TAY;
@@ -1288,7 +1236,6 @@ uint8_t cpu_tay() {
 
 uint8_t cpu_tya() {
     reg_accumulator = reg_y;
-    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return TYA;
@@ -1296,7 +1243,6 @@ uint8_t cpu_tya() {
 
 uint8_t cpu_tsx() {
     reg_x = stackPointer;
-    // cycles += 1;
     cpu_setFlag(CPUSTAT_ZERO, reg_x == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_x & 0b10000000) != 0);
     return TSX;
@@ -1304,7 +1250,6 @@ uint8_t cpu_tsx() {
 
 uint8_t cpu_txs() {
     stackPointer = reg_x;
-    // cycles += 1;
     return TXS;
 }
 
@@ -1334,7 +1279,6 @@ uint8_t cpu_plp() {
 
 uint8_t cpu_jmp(uint16_t address) {
     reg_pc = address;
-    // cycles += 2;
     return JMP;
 }
 
@@ -1343,13 +1287,11 @@ uint8_t cpu_jsr(uint16_t address) {
     uint16_t returnAddress = reg_pc - 1;
     reg_pc = address;
     cpu_stackPush16(returnAddress);
-    // cycles += 2;
     return JSR;
 }
 
 uint8_t cpu_rts() {
     reg_pc = cpu_stackPull16() + 1;
-    // cycles += 1;
     return RTS;
 }
 
@@ -1357,49 +1299,41 @@ uint8_t cpu_rti() {
     reg_status = cpu_stackPull();
     reg_pc = cpu_stackPull16();
     cpu_setFlag(CPUSTAT_BREAK2, true); // always ensure BREAK2 is set
-    // cycles += 1;
     return RTI;
 }
 
 uint8_t cpu_clc() {
     cpu_setFlag(CPUSTAT_CARRY, 0);
-    // cycles += 1;
     return CLC;
 }
 
 uint8_t cpu_sec() {
     cpu_setFlag(CPUSTAT_CARRY, 1);
-    // cycles += 1;
     return SEC;
 }
 
 uint8_t cpu_cld() {
     cpu_setFlag(CPUSTAT_DECIMAL, 0);
-    // cycles += 1;
     return CLD;
 }
 
 uint8_t cpu_sed() {
     cpu_setFlag(CPUSTAT_DECIMAL, 1);
-    // cycles += 1;
     return SED;
 }
 
 uint8_t cpu_cli() {
     cpu_setFlag(CPUSTAT_NO_INTRPT, 0);
-    // cycles += 1;
     return CLI;
 }
 
 uint8_t cpu_sei() {
     cpu_setFlag(CPUSTAT_NO_INTRPT, 1);
-    // cycles += 1;
     return SEI;
 }
 
 uint8_t cpu_clv() {
     cpu_setFlag(CPUSTAT_OVERFLOW, 0);
-    // cycles += 1;
     return CLV;
 }
 
@@ -1410,7 +1344,6 @@ uint8_t cpu_brk() {
 }
 
 uint8_t cpu_nop() {
-    // cycles += 1;
     return NOP;
 }
 
@@ -1465,7 +1398,7 @@ uint8_t cpu_illegal_lax(uint16_t address) {
 uint8_t cpu_illegal_lxa(uint16_t address) {
     reg_accumulator = (rand() % 256) & bus_readCPU(address);
     reg_x = reg_accumulator;
-    // cycles += 1;
+    
     return IL_LXA;
 }
 
@@ -1483,14 +1416,14 @@ uint8_t cpu_illegal_rra(uint16_t address) {
 
 uint8_t cpu_illegal_sax(uint16_t address) {
     bus_writeCPU(address, reg_accumulator & reg_x);
-    // cycles += 1;
+    
     return IL_SAX;
 }
 
 uint8_t cpu_illegal_sbx(uint16_t address) {
     uint8_t memVal = bus_readCPU(address);
     uint8_t cmpVal = reg_accumulator & reg_x;
-    // cycles += 1;
+    
 
     int8_t signedResult = ((int8_t) cmpVal) - ((int8_t) memVal);
     if (cmpVal < memVal) {
@@ -1515,7 +1448,7 @@ uint8_t cpu_illegal_sha(uint16_t address) {
     } else {
         bus_writeCPU(address, reg_accumulator & reg_x & ((bus_readCPU(address) >> 8) + 1));
     }
-    // cycles += 1;
+    
     return IL_SHA;
 }
 
@@ -1526,7 +1459,7 @@ uint8_t cpu_illegal_shx(uint16_t address) {
     } else {
         bus_writeCPU(address, reg_x & ((bus_readCPU(address) >> 8) + 1));
     }
-    // cycles += 1;
+    
     return IL_SHX;
 }
 
@@ -1537,7 +1470,7 @@ uint8_t cpu_illegal_shy(uint16_t address) {
     } else {
         bus_writeCPU(address, reg_y & ((bus_readCPU(address) >> 8) + 1));
     }
-    // cycles += 1;
+    
     return IL_SHY;
 }
 
@@ -1561,7 +1494,7 @@ uint8_t cpu_illegal_tas(uint16_t address) {
     } else {
         bus_writeCPU(address, reg_accumulator & reg_x & ((bus_readCPU(address) >> 8) + 1));
     }
-    // cycles += 1;
+    
     return IL_TAS;
 }
 
@@ -1571,12 +1504,11 @@ uint8_t cpu_illegal_sbc(uint16_t address) {
 }
 
 uint8_t cpu_illegal_jam() {
-    cpu_brk(); // not really but close enough
+    cpu_brk(); // not really but I doubt it'll affect any games
     return IL_JAM;
 }
 
 uint8_t cpu_illegal_nop(uint16_t address) {
-    // cycles += 1;
     return IL_NOP;
 }
 
