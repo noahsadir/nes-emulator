@@ -31,7 +31,7 @@ uint8_t reg_y = 0x00;
 uint16_t reg_pc = 0x0000;
 uint8_t stackPointer = 0xFD;
 
-uint64_t cycles = 4;
+uint64_t cycles = 0;
 
 bool accumulatorAddrMode = false;
 bool didPanic = false;
@@ -904,12 +904,9 @@ uint8_t cpu_sty(uint16_t address) {
 
 uint8_t cpu_adc(uint16_t address) {
     uint8_t memoryVal = bus_readCPU(address);
-
     uint16_t sum = reg_accumulator + memoryVal + ((uint16_t) cpu_getFlag(CPUSTAT_CARRY));
-
     cpu_setFlag(CPUSTAT_CARRY, sum > 0xFF);
     cpu_setFlag(CPUSTAT_OVERFLOW, (reg_accumulator ^ sum) & (memoryVal ^ sum) & 0x80);
-
     reg_accumulator = (uint8_t) sum;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
@@ -918,12 +915,9 @@ uint8_t cpu_adc(uint16_t address) {
 
 uint8_t cpu_sbc(uint16_t address) {
     uint8_t memoryVal = ~bus_readCPU(address);
-
     uint16_t sum = reg_accumulator + memoryVal + ((uint16_t) cpu_getFlag(CPUSTAT_CARRY));
-
     cpu_setFlag(CPUSTAT_CARRY, sum > 0xFF);
     cpu_setFlag(CPUSTAT_OVERFLOW, (reg_accumulator ^ sum) & (memoryVal ^ sum) & 0x80);
-
     reg_accumulator = (uint8_t) sum;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
@@ -933,7 +927,6 @@ uint8_t cpu_sbc(uint16_t address) {
 uint8_t cpu_inc(uint16_t address) {
     uint8_t val = bus_readCPU(address) + 1;
     bus_writeCPU(address, val);
-
     cpu_setFlag(CPUSTAT_ZERO, val == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (val & 0b10000000) != 0);
     return INC;
@@ -941,7 +934,6 @@ uint8_t cpu_inc(uint16_t address) {
 
 uint8_t cpu_inx() {
     reg_x += 1;
-
     cpu_setFlag(CPUSTAT_ZERO, reg_x == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_x & 0b10000000) != 0);
     return INX;
@@ -949,7 +941,6 @@ uint8_t cpu_inx() {
 
 uint8_t cpu_iny() {
     reg_y += 1;
-
     cpu_setFlag(CPUSTAT_ZERO, reg_y == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_y & 0b10000000) != 0);
     return INY;
@@ -958,17 +949,13 @@ uint8_t cpu_iny() {
 uint8_t cpu_dec(uint16_t address) {
     uint8_t val = bus_readCPU(address) - 1;
     bus_writeCPU(address, val);
-    
-
     cpu_setFlag(CPUSTAT_ZERO, val == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (val & 0b10000000) != 0);
     return DEC;
 }
 
 uint8_t cpu_dex() {
-    reg_x -= 1;
-
-    
+    reg_x -= 1;    
     cpu_setFlag(CPUSTAT_ZERO, reg_x == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_x & 0b10000000) != 0);
     return DEX;
@@ -976,7 +963,6 @@ uint8_t cpu_dex() {
 
 uint8_t cpu_dey() {
     reg_y -= 1;
-
     cpu_setFlag(CPUSTAT_ZERO, reg_y == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_y & 0b10000000) != 0);
     return DEY;

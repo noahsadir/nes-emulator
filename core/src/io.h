@@ -1,9 +1,9 @@
 /**
- * @file main.h
+ * @file io.h
  * @author Noah Sadir (development.noahsadir@gmail.com)
- * @brief Main driver program for NES emulator
+ * @brief Handle I/O
  * @version 1.0
- * @date 2022-07-06
+ * @date 2022-07-15
  * 
  * @copyright Copyright (c) 2022 Noah Sadir
  * 
@@ -26,27 +26,36 @@
  * IN THE SOFTWARE.
  */
 
-#include "bus.h"
-#include "exceptions.h"
+#ifndef IO_H
+#define IO_H
 
-#include <fcntl.h>
-#include <stdio.h>
-#include <unistd.h>
+#include <SDL2/SDL.h>
 #include <stdint.h>
 #include <stdbool.h>
 
-/**
- * @brief Load an iNES ROM file and initialize hardware
- * 
- * @param path the file path of the iNES ROM file
- */
-void loadROM(char* path);
+#include "bus.h"
+
+struct JoypadMapping {
+    SDL_KeyCode up;
+    SDL_KeyCode down;
+    SDL_KeyCode left;
+    SDL_KeyCode right;
+    SDL_KeyCode a;
+    SDL_KeyCode b;
+    SDL_KeyCode select;
+    SDL_KeyCode start;
+};
 
 /**
- * @brief Main entry point of program
- * 
- * @param argc argument count
- * @param argv argumnet strings
- * @return int the exit status
+ * @brief Initialize I/O
  */
-int main(int argc, char* argv[]);
+void io_init(uint16_t scl);
+
+/**
+ * @brief Update controller and display values
+ * 
+ * @param bitmap the screen bitmap of the PPU
+ */
+void io_update(uint32_t* bitmap);
+
+#endif

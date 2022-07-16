@@ -195,6 +195,7 @@ void ppu_drawScanline(uint8_t y) {
         }
     }
 
+    // this is too nested for my liking
     if (ppu_getMaskFlag(PPUMASK_SHOWSPRIT)) {
         for (int i = 0; i < 256; i += 4) {
             
@@ -222,12 +223,13 @@ void ppu_drawScanline(uint8_t y) {
 
                         if (containsSpriteZero && i == 0) {
                             triggerSpriteZero = true;
-                        }
-                    }
-                }
-            }
-        }
-    }
+                        } // bracket 6 of 6
+                    } // bracket 5 of 6
+                } // bracket 4 of 6
+            } // bracket 3 of 6
+        } // bracket 2 of 6
+    } // bracket 1 of 6
+
 }
 
 void ppu_drawCHRROM(uint16_t bank) {

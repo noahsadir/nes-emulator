@@ -31,25 +31,14 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <SDL2/SDL.h>
 #include <sys/time.h>
 #include <unistd.h>
 
 #include "cpu.h"
 #include "ppu.h"
+#include "io.h"
 #include "joypad.h"
 #include "exceptions.h"
-
-struct JoypadMapping {
-    SDL_KeyCode up;
-    SDL_KeyCode down;
-    SDL_KeyCode left;
-    SDL_KeyCode right;
-    SDL_KeyCode a;
-    SDL_KeyCode b;
-    SDL_KeyCode select;
-    SDL_KeyCode start;
-};
 
 /* INITIALIZATION METHODS */
 
@@ -85,7 +74,7 @@ void bus_loadPRGROM(uint8_t* romData_PTR, uint16_t romSize);
  */
 void bus_loadCHRROM(uint8_t* romData_PTR, uint16_t romSize);
 
-/* I/O METHODS */
+/* DATA METHODS */
 
 /**
  * @brief Perform read operation at mapped address
@@ -134,6 +123,20 @@ uint8_t bus_readPPU(uint16_t address);
  * @param data the data to write
  */
 void bus_writePPU(uint16_t address, uint8_t data);
+
+/**
+ * @brief Set a button on the joypad
+ * 
+ * @param button the button to set
+ */
+void bus_setJoypad(enum JoypadButton button);
+
+/**
+ * @brief Unset a button on the joypad
+ * 
+ * @param button the button to unset
+ */
+void bus_unsetJoypad(enum JoypadButton button);
 
 /* MONITORS */
 

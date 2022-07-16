@@ -47,11 +47,6 @@ bool disablePPU = false;
 uint64_t msecCounter = 0;
 uint64_t clocksPerMsec = 0;
 
-SDL_Window* window;
-SDL_Surface* surface;
-
-struct JoypadMapping keyMap;
-
 uint8_t bus_readCPU(uint16_t address) {
     if (address < 0x2000) { // cpu ram
         address = address % 0x800; // mirrored
@@ -90,9 +85,9 @@ uint8_t bus_readCPU(uint16_t address) {
             
         }
     } else if (address < 0x6000) { // expansion rom
-        exc_panic_invalidIO(address);
+        if (panicOnUnimplemented) exc_panic_invalidIO(address);
     } else if (address < 0x8000) { // save ram
-        exc_panic_invalidIO(address);
+        if (panicOnUnimplemented) exc_panic_invalidIO(address);
     } else if (address < 0xFFFF) { // prg rom
         address -= 0x8000;
         return prgROM[address];
@@ -142,7 +137,7 @@ void bus_writeCPU(uint16_t address, uint8_t data) {
     } else if (address < 0x8000) { // save ram
         if (panicOnUnimplemented) exc_panic_invalidIO(address);
     } else if (address < 0xFFFF) { // prg rom
-        exc_panic_invalidIO(address);
+        if (panicOnUnimplemented) exc_panic_invalidIO(address);
     }
 }
 
@@ -247,7 +242,14 @@ void bus_writePPU(uint16_t address, uint8_t data) {
         }
         paletteRAM[address] = data;
     }
-    
+}
+
+void bus_setJoypad(enum JoypadButton button) {
+    joypad_setButton(button);
+}
+
+void bus_unsetJoypad(enum JoypadButton button) {
+    joypad_unsetButton(button);
 }
 
 void bus_loadPRGROM(uint8_t* romData_PTR, uint16_t romSize) {
@@ -273,8 +275,8 @@ uint64_t bus_endTimeMonitor() {
         printf("CPU Frequency: %.5f MHz\n", frequency);
     } else {
         gettimeofday(&total2, NULL);
-        totalTime = (total2.tv_sec - total1.tv_sec) * 1000.0;      // sec to ms
-        totalTime += (total2.tv_usec - total1.tv_usec) / 1000.0;   // us to ms
+        totalTime = (total2.tv_sec - total1.tv_sec) * 1000.0;
+        totalTime += (total2.tv_usec - total1.tv_usec) / 1000.0;
         totalTime *= 1000;
 
         double frequency = ((double) cpu_getCycles()) / ((double) totalTime);
@@ -294,8 +296,8 @@ uint64_t bus_pollTimeMonitor() {
     gettimeofday(&total2, NULL);
     uint64_t elapsedTime;
     elapsedTime = (t2.tv_nsec - t1.tv_nsec);
-    totalTime = (total2.tv_sec - total1.tv_sec) * 1000.0;      // sec to ms
-    totalTime += (total2.tv_usec - total1.tv_usec) / 1000.0;   // us to ms
+    totalTime = (total2.tv_sec - total1.tv_sec) * 1000.0;
+    totalTime += (total2.tv_usec - total1.tv_usec) / 1000.0;
     totalTime *= 1000;
     clock_gettime(CLOCK_REALTIME, &t1);
     return elapsedTime;
@@ -312,22 +314,7 @@ void bus_initPPU() {
 }
 
 void bus_initDisplay() {
-    if (!disablePPU) {
-        uint16_t x = 256;
-        uint16_t y = 240;
-        uint16_t scale = 2;
-        SDL_Init(SDL_INIT_VIDEO);
-        window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, x * scale, y * scale, SDL_WINDOW_SHOWN);
-        surface = SDL_GetWindowSurface(window);
-        keyMap.up = SDLK_w;
-        keyMap.down = SDLK_s;
-        keyMap.left = SDLK_a;
-        keyMap.right = SDLK_d;
-        keyMap.a = SDLK_SPACE;
-        keyMap.b = SDLK_RSHIFT;
-        keyMap.start = SDLK_RETURN;
-        keyMap.select = SDLK_p;
-    }
+    io_init(3);
 }
 
 void bus_cpuReport(uint8_t cycleCount) {
@@ -364,72 +351,9 @@ void bus_cpuReport(uint8_t cycleCount) {
 }
 
 void bus_ppuReport(uint32_t* bitmap) {
-    
-    // Sort of a v-sync
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_KEYDOWN) {
-            if (event.key.keysym.sym == keyMap.up) {
-                joypad_setButton(JP_UP);
-            } else if (event.key.keysym.sym == keyMap.down) {
-                joypad_setButton(JP_DOWN);
-            } else if (event.key.keysym.sym == keyMap.left) {
-                joypad_setButton(JP_LEFT);
-            } else if (event.key.keysym.sym == keyMap.right) {
-                joypad_setButton(JP_RIGHT);
-            } else if (event.key.keysym.sym == keyMap.a) {
-                joypad_setButton(JP_BTN_A);
-            } else if (event.key.keysym.sym == keyMap.b) {
-                joypad_setButton(JP_BTN_B);
-            } else if (event.key.keysym.sym == keyMap.select) {
-                joypad_setButton(JP_SELECT);
-            } else if (event.key.keysym.sym == keyMap.start) {
-                joypad_setButton(JP_START);
-            }
-        }
-
-        if (event.type == SDL_KEYUP) {
-            if (event.key.keysym.sym == keyMap.up) {
-                joypad_unsetButton(JP_UP);
-            } else if (event.key.keysym.sym == keyMap.down) {
-                joypad_unsetButton(JP_DOWN);
-            } else if (event.key.keysym.sym == keyMap.left) {
-                joypad_unsetButton(JP_LEFT);
-            } else if (event.key.keysym.sym == keyMap.right) {
-                joypad_unsetButton(JP_RIGHT);
-            } else if (event.key.keysym.sym == keyMap.a) {
-                joypad_unsetButton(JP_BTN_A);
-            } else if (event.key.keysym.sym == keyMap.b) {
-                joypad_unsetButton(JP_BTN_B);
-            } else if (event.key.keysym.sym == keyMap.select) {
-                joypad_unsetButton(JP_SELECT);
-            } else if (event.key.keysym.sym == keyMap.start) {
-                joypad_unsetButton(JP_START);
-            }
-        }
-
-        if (event.type == SDL_QUIT) {
-            cpu_panic();
-        }
+    if (!disablePPU) {
+        io_update(bitmap);
     }
-
-    SDL_FreeSurface(surface);
-    uint32_t* pixels = (uint32_t*)surface->pixels;
-    SDL_LockSurface(surface);
-    
-    uint8_t scale = 2;
-    for (int i = 0; i < 256 * 240; i++) {
-        
-        int x = i % 256;
-        int y = i / 256;
-        pixels[(x * scale) + (y * scale * scale * 256)] = bitmap[i];
-        pixels[(x * scale) + (y * scale * scale * 256) + 1] = bitmap[i];
-        pixels[(x * scale) + (y * scale * scale * 256) + (scale * 256)] = bitmap[i];
-        pixels[(x * scale) + (y * scale * scale * 256) + (scale * 256) + 1] = bitmap[i];
-        
-    }
-    SDL_UnlockSurface(surface);
-    SDL_UpdateWindowSurface(window);
 }
 
 void bus_triggerNMI() {

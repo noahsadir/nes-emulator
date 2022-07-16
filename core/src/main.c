@@ -152,6 +152,11 @@ void loadROM(char* path) {
 }
 
 int main(int argc, char* argv[]) {
+
+    bool arg_genTrace = false;
+    bool arg_limitClocks = true;
+    uint8_t arg_scale = 0;
+
     if (argc >= 2) {
         loadROM(argv[1]);
     } else {

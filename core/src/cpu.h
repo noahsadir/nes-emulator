@@ -110,7 +110,7 @@ void cpu_reset();
 uint8_t cpu_execute();
 
 /*
- * No need for documentation; you know what these do.
+ * CPU Instructions
  * Reminder: https://www.masswerk.at/6502/6502_instruction_set.html
  */ 
 uint8_t cpu_lda(uint16_t address);

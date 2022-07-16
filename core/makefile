@@ -7,6 +7,7 @@ default: clean compile link
 
 compile:
 	mkdir -p $(OBJ)
+	gcc $(CFLAGS) -g -O -c $(SRC)/io.c -o $(OBJ)/io.o
 	gcc $(CFLAGS) -g -O -c $(SRC)/exceptions.c -o $(OBJ)/exceptions.o
 	gcc $(CFLAGS) -g -O -c $(SRC)/joypad.c -o $(OBJ)/joypad.o
 	gcc $(CFLAGS) -g -O -c $(SRC)/ppu.c -o $(OBJ)/ppu.o
@@ -16,7 +17,7 @@ compile:
 
 link:
 	mkdir -p $(BIN)
-	gcc -o $(BIN)/emulator $(OBJ)/joypad.o $(OBJ)/exceptions.o $(OBJ)/ppu.o $(OBJ)/bus.o $(OBJ)/cpu.o $(OBJ)/main.o -lSDL2
+	gcc -o $(BIN)/emulator $(OBJ)/io.o $(OBJ)/joypad.o $(OBJ)/exceptions.o $(OBJ)/ppu.o $(OBJ)/bus.o $(OBJ)/cpu.o $(OBJ)/main.o -lSDL2
 
 clean:
 	rm -f $(OBJ)/*
