@@ -31,21 +31,21 @@ uint8_t paletteRAM[32];
 uint8_t* prgROM;
 uint8_t* chrROM;
 
-struct timespec t1, t2;
-struct timeval total1, total2;
-
-double elapsedTime;
-uint64_t totalTime = 0;
-uint64_t dataPoints = 0;
-bool verticalMirroring = false;
-
 // config
+bool verticalMirroring = false;
 bool panicOnUnimplemented = false;
-bool limitClockSpeed = true;
-bool disablePPU = false;
+bool audioEnabled = false;
+bool graphicsEnabled = true;
+bool cpuPaused = false;
+SyncMode syncMode = SYNC_REALTIME;
 
-uint64_t msecCounter = 0;
-uint64_t clocksPerMsec = 0;
+int32_t cyclesUntilDelay = 0;
+int32_t cyclesUntilSample = 0;
+int32_t cyclesUntilSecond = 0;
+uint64_t frameIntervalCount = 0;
+uint32_t cpuTimeCount = 0;
+
+Trace trace;
 
 uint8_t bus_readCPU(uint16_t address) {
     if (address < 0x2000) { // cpu ram
@@ -85,9 +85,13 @@ uint8_t bus_readCPU(uint16_t address) {
             
         }
     } else if (address < 0x6000) { // expansion rom
+        #if (DEBUG_MODE)
         if (panicOnUnimplemented) exc_panic_invalidIO(address);
+        #endif
     } else if (address < 0x8000) { // save ram
+        #if (DEBUG_MODE)
         if (panicOnUnimplemented) exc_panic_invalidIO(address);
+        #endif
     } else if (address < 0xFFFF) { // prg rom
         address -= 0x8000;
         return prgROM[address];
@@ -133,11 +137,17 @@ void bus_writeCPU(uint16_t address, uint8_t data) {
             
         }    
     } else if (address < 0x6000) { // expansion rom
+        #if (DEBUG_MODE)
         if (panicOnUnimplemented) exc_panic_invalidIO(address);
+        #endif
     } else if (address < 0x8000) { // save ram
+        #if (DEBUG_MODE)
         if (panicOnUnimplemented) exc_panic_invalidIO(address);
+        #endif
     } else if (address < 0xFFFF) { // prg rom
+        #if (DEBUG_MODE)
         if (panicOnUnimplemented) exc_panic_invalidIO(address);
+        #endif
     }
 }
 
@@ -146,11 +156,17 @@ uint16_t bus_readCPUAddr(uint16_t address) {
         address = address % 0x800; // mirrored
         return ((uint16_t) cpuRAM[address] << 8) | ((uint16_t) cpuRAM[address]);
     } else if (address < 0x4020) { // io registers
+        #if (DEBUG_MODE)
         if (panicOnUnimplemented) exc_panic_invalidIO(address);
+        #endif
     } else if (address < 0x6000) { // expansion rom
+        #if (DEBUG_MODE)
         if (panicOnUnimplemented) exc_panic_invalidIO(address);
+        #endif
     } else if (address < 0x8000) { // save ram
+        #if (DEBUG_MODE)
         if (panicOnUnimplemented) exc_panic_invalidIO(address);
+        #endif
     } else if (address < 0xFFFF) { // prg rom
         address -= 0x8000;
         return (((uint16_t) prgROM[address + 1]) << 8) | ((uint16_t) prgROM[address]);
@@ -164,7 +180,9 @@ void bus_writeCPUAddr(uint16_t address, uint16_t data) {
         cpuRAM[address] = (data << 8) >> 8;
         cpuRAM[address + 1] = data >> 8;
     } else {
+        #if (DEBUG_MODE)
         if (panicOnUnimplemented) exc_panic_invalidIO(address);
+        #endif
     }
 }
 
@@ -210,7 +228,9 @@ uint8_t bus_readPPU(uint16_t address) {
 void bus_writePPU(uint16_t address, uint8_t data) {
     address = address % 0x4000;
     if (address < 0x2000) { // chr rom
+        #if (DEBUG_MODE)
         if (panicOnUnimplemented) exc_panic_invalidPPUIO(address);
+        #endif
     } else if (address < 0x3F00) { // vram
         address = (address % 0x2000) + 0x2000;
         if (verticalMirroring) {
@@ -260,55 +280,41 @@ void bus_loadCHRROM(uint8_t* romData_PTR, uint16_t romSize) {
     chrROM = romData_PTR;
 }
 
-void bus_startTimeMonitor() {
-    clock_gettime(CLOCK_REALTIME, &t1);
-    gettimeofday(&total1, NULL);
-}
-
-uint64_t bus_endTimeMonitor() {
-
-    if (disablePPU) {
-        totalTime = bus_pollTimeMonitor();
-        double frequency = ((double) cpu_getCycles()) / ((double) totalTime) * 1000;
-
-        printf("Finished %llu cycles and %llu frames in %llu nanoseconds\n", cpu_getCycles(), ppu_getFrames(), totalTime);
-        printf("CPU Frequency: %.5f MHz\n", frequency);
-    } else {
-        gettimeofday(&total2, NULL);
-        totalTime = (total2.tv_sec - total1.tv_sec) * 1000.0;
-        totalTime += (total2.tv_usec - total1.tv_usec) / 1000.0;
-        totalTime *= 1000;
-
-        double frequency = ((double) cpu_getCycles()) / ((double) totalTime);
-        double framerate = ((double) ppu_getFrames()) / (((double) totalTime) / 1000000);
-
-        printf("Finished %llu cycles and %llu frames in %llu microseconds\n", cpu_getCycles(), ppu_getFrames(), totalTime);
-        printf("CPU Frequency: %.5f MHz\n", frequency);
-        printf("    Framerate: %.5f FPS\n", framerate);
-    }
-
-   
-    return (uint64_t) elapsedTime;
-}
-
-uint64_t bus_pollTimeMonitor() {
-    clock_gettime(CLOCK_REALTIME, &t2);
-    gettimeofday(&total2, NULL);
-    uint64_t elapsedTime;
-    elapsedTime = (t2.tv_nsec - t1.tv_nsec);
-    totalTime = (total2.tv_sec - total1.tv_sec) * 1000.0;
-    totalTime += (total2.tv_usec - total1.tv_usec) / 1000.0;
-    totalTime *= 1000;
-    clock_gettime(CLOCK_REALTIME, &t1);
-    return elapsedTime;
-}
-
 void bus_initCPU() {
-    cpu_init();
+    #if (DEBUG_MODE)
+    exc_traceInit();
+    #endif
+    cpu_init(&bus_writeCPU, &bus_readCPU, &trace);
+    bus_initClock();
+}
+
+void bus_initClock() {
+    Instruction inst = NOP;
+    struct timeval tv1, tv2;
+    gettimeofday(&tv1, NULL);
+    uint64_t elapsed;
+    while (inst != BRK)
+    {
+        gettimeofday(&tv2, NULL);
+        elapsed = ((tv2.tv_sec - tv1.tv_sec) * 1000000) + (tv2.tv_usec - tv1.tv_usec);
+        if (elapsed >= USEC_PER_FRAME) {
+            bus_frameIntervalReport();
+            tv1 = tv2;
+            elapsed -= USEC_PER_FRAME;
+        }
+
+        if (!cpuPaused) {
+            inst = cpu_execute(&bus_cpuReport);
+        }
+    }
+    bus_triggerCPUPanic();
 }
 
 void bus_initPPU() {
-    if (!disablePPU) {
+    #if (DEBUG_MODE)
+    graphicsEnabled = false;
+    #endif
+    if (graphicsEnabled) {
         ppu_init(vidRAM, chrROM);
     }
 }
@@ -318,48 +324,77 @@ void bus_initDisplay() {
 }
 
 void bus_cpuReport(uint8_t cycleCount) {
-    
-    if (!disablePPU) {
+    // update PPU
+    if (graphicsEnabled) {
+        // run 3x the number of cycles on the PPU
         ppu_runCycles(cycleCount * 3);
 
-        if (ppu_getControlFlag(PPUCTRL_GENVBNMI) && ppu_getStatusFlag(PPUSTAT_VBLKSTART)) {
+        // determine if necessary to generate NMI
+        if (ppu_getControlFlag(PPUCTRL_GENVBNMI)
+            && ppu_getStatusFlag(PPUSTAT_VBLKSTART)) {
             bus_triggerNMI();
             ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
         }
-    
-        // It's recommended to keep this enabled since a higher framerate will
-        // not only mess up timing/audio, but will also use 100% of CPU
-        if (limitClockSpeed) {
-            clocksPerMsec += cycleCount;
-            msecCounter += bus_pollTimeMonitor();
-            if (msecCounter >= 1000000) {
-            
-                int32_t remainingClocks = clocksPerMsec - 1789;
-                if (remainingClocks > 0) {
-                    uint16_t catchup = ((double) remainingClocks) * 0.559f;
-                    uint16_t framerate = ((double) ppu_getFrames()) / (((double) totalTime) / 1000000);
-                    if (framerate > 60) {
-                        usleep(catchup);
-                    }
-                }
-
-                msecCounter = 0;
-                clocksPerMsec = 0;
-            }
-        }
     }
+
+    // update cycle counters
+    cyclesUntilDelay -= cycleCount;
+    cyclesUntilSample -= cycleCount;
+    cyclesUntilSecond -= cycleCount;
+
+     // pause CPU until next frame interval
+    if (cyclesUntilDelay <= 0) {
+        if (syncMode != SYNC_DISABLED) cpuPaused = true;
+        cyclesUntilDelay += CPU_FRAME_CLOCKS;
+    }
+
+    // CPU second has elapsed (CPU second = 1789773 clocks)
+    if (cyclesUntilSecond <= 0) {
+        cpuTimeCount += 1;
+        cyclesUntilSecond = CPU_CLOCK_SPEED;
+    }
+
+    // fill audio buffer
+    if (audioEnabled && cyclesUntilSample <= 0) {
+        // TODO: Queue audio sample
+        cyclesUntilSample = 40;
+    }
+
+    #if (DEBUG_MODE)
+    exc_trace(&trace);
+    #endif
+}
+
+void bus_frameIntervalReport() {
+    frameIntervalCount += 1;
+    if (syncMode == SYNC_REALTIME) cpuPaused = false;
 }
 
 void bus_ppuReport(uint32_t* bitmap) {
-    if (!disablePPU) {
-        io_update(bitmap);
-    }
+    if (graphicsEnabled) io_update(bitmap);
 }
 
 void bus_triggerNMI() {
-    cpu_vblankNMI();
+    cpu_nmi();
 }
 
 void bus_triggerCPUPanic() {
+    bus_cpuKillReport();
     cpu_panic();
+}
+
+void bus_cpuKillReport() {
+    uint32_t realTimeCount = frameIntervalCount / FRAMERATE;
+
+    double floatingCPUTime = (double) cpuTimeCount;
+    double floatingRealTime = (double) realTimeCount;
+    double realClockSpeed = (((double)CPU_CLOCK_SPEED) * (floatingCPUTime / floatingRealTime)) / 1000000;
+
+    printf("** EMULATION STOPPED **\n");
+    printf("\n");
+    printf("CPU Time Elapsed: %d seconds\n", cpuTimeCount);
+    printf("Real Time Elapsed: %d seconds\n", realTimeCount);
+    printf("\n");
+    printf("Real Clock Speed: %.4f MHz\n", realClockSpeed);
+    printf("\n");
 }

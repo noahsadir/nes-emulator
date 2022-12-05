@@ -29,12 +29,17 @@
 #ifndef CPU_H
 #define CPU_H
 
-#include "bus.h"
+#define DEBUG_MODE 0
 
-#include <stdint.h>
+#include <stdlib.h>
 #include <stdbool.h>
 
-enum CPUStatusFlag {
+#if (DEBUG_MODE)
+#include <string.h>
+#include <stdio.h>
+#endif
+
+typedef enum {
     CPUSTAT_CARRY       = 0b00000001,
     CPUSTAT_ZERO        = 0b00000010,
     CPUSTAT_NO_INTRPT   = 0b00000100,
@@ -43,9 +48,9 @@ enum CPUStatusFlag {
     CPUSTAT_BREAK2      = 0b00100000,
     CPUSTAT_OVERFLOW    = 0b01000000,
     CPUSTAT_NEGATIVE    = 0b10000000
-};
+} CPUStatusFlag;
 
-enum AddressingMode {
+typedef enum {
     ADM_ACCUMULATOR,
     ADM_IMPLIED,
     ADM_IMMEDIATE,
@@ -59,9 +64,9 @@ enum AddressingMode {
     ADM_ZP_Y,
     ADM_ZP_INDIRECT_X,
     ADM_ZP_INDIRECT_Y
-};
+} AddressingMode;
 
-enum Instruction {
+typedef enum {
     LDA, LDX, LDY, STA, STX, STY, ADC, SBC, INC, INX, INY, DEC, DEX, DEY, ASL,
     LSR, ROL, ROR, AND, ORA, EOR, CMP, CPX, CPY, BIT, BCC, BCS, BNE, BEQ, BPL,
     BMI, BVC, BVS, TAX, TXA, TAY, TYA, TSX, TXS, PLA, PHA, PHP, PLP, JMP, JSR,
@@ -69,14 +74,52 @@ enum Instruction {
     IL_ALR, IL_ANC, IL_ANE, IL_ARR, IL_DCP, IL_ISC, IL_LAS, IL_LAX, IL_LXA,
     IL_RLA, IL_RRA, IL_SAX, IL_SBX, IL_SHA, IL_SHX, IL_SHY, IL_SLO, IL_SRE,
     IL_TAS, IL_SBC, IL_JAM, IL_NOP
-};
+} Instruction;
+
+typedef struct {
+    char instruction[5];
+    uint8_t opcode;
+    uint8_t firstParam;
+    uint8_t secondParam;
+    char parameterString[64];
+    char redirectString[64];
+    uint16_t offsetAddress;
+    uint16_t reg_pc;
+    uint8_t reg_a;
+    uint8_t reg_x;
+    uint8_t reg_y;
+    uint8_t reg_status;
+    uint8_t stackPointer;
+    uint64_t ppuBlanks;
+    uint64_t ppuCycles;
+    uint64_t cpuCycles;
+    int paramCount;
+} Trace;
 
 /* PUBLIC METHODS - INTENDED FOR EXTERNAL USE */
 
 /**
  * @brief Start the CPU
+ * 
+ * @param w the pointer to the write function
+ * @param r the pointer to the read function
  */
-void cpu_init();
+void cpu_init(void(*w)(uint16_t, uint8_t), uint8_t(*r)(uint16_t), Trace* trace);
+
+/**
+ * @brief Execute an instruction
+ * 
+ * @param c the callback function storing the number of cycles elasped
+ */
+Instruction cpu_execute(void(*c)(uint8_t));
+
+/**
+ * @brief Read address from memory
+ * 
+ * @param address the location in memory where the address is stored
+ * @return uint16_t the address stored at the location in memory
+ */
+uint16_t cpu_readAddr(uint16_t address);
 
 /**
  * @brief Get the number of cycles performed by the CPU
@@ -88,7 +131,7 @@ uint64_t cpu_getCycles();
 /**
  * @brief CPU recieved an NMI
  */
-void cpu_vblankNMI();
+void cpu_nmi();
 
 /**
  * @brief aaaaaaaaaaaaaaah
@@ -107,11 +150,11 @@ void cpu_reset();
  * 
  * @return uint8_t the number of cycles elapsed
  */
-uint8_t cpu_execute();
+uint8_t cpu_run_instruction();
 
 /*
  * CPU Instructions
- * Reminder: https://www.masswerk.at/6502/6502_instruction_set.html
+ * https://www.masswerk.at/6502/6502_instruction_set.html
  */ 
 uint8_t cpu_lda(uint16_t address);
 uint8_t cpu_ldx(uint16_t address);
@@ -198,7 +241,7 @@ uint8_t cpu_illegal_jam();
  * @param desiredResult the value to branch on
  * @param flag the flag to check
  */
-void cpu_branchHelper(bool desiredResult, enum CPUStatusFlag flagVal);
+void cpu_branchHelper(bool desiredResult, CPUStatusFlag flagVal);
 
 /**
  * @brief Get the instruction string
@@ -206,7 +249,7 @@ void cpu_branchHelper(bool desiredResult, enum CPUStatusFlag flagVal);
  * @param instruction the CPU instruction
  * @return char* the resulting string
  */
-char* cpu_getInstructionString(enum Instruction instruction);
+char* cpu_getInstructionString(Instruction instruction);
 
 /**
  * @brief Trace the CPU instruction
@@ -215,7 +258,7 @@ char* cpu_getInstructionString(enum Instruction instruction);
  * @param mode the addressing mode
  * @param address the derived address
  */
-void cpu_trace(enum Instruction instruction, enum AddressingMode mode, uint16_t address);
+Trace cpu_trace(Instruction instruction, AddressingMode mode, uint16_t address);
 
 /**
  * @brief Get address using specified mode
@@ -223,7 +266,7 @@ void cpu_trace(enum Instruction instruction, enum AddressingMode mode, uint16_t 
  * @param mode the mode to fetch
  * @return uint16_t the resulting address
  */
-uint16_t cpu_fetchAddress(enum AddressingMode mode);
+uint16_t cpu_fetchAddress(AddressingMode mode);
 
 /**
  * @brief Set a status flag of CPU
@@ -231,7 +274,7 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode);
  * @param flag the flag to set
  * @param val the value of the flag
  */
-void cpu_setFlag(enum CPUStatusFlag flag, bool enable);
+void cpu_setFlag(CPUStatusFlag flag, bool enable);
 
 /**
  * @brief Get a status flag of CPU
@@ -239,7 +282,7 @@ void cpu_setFlag(enum CPUStatusFlag flag, bool enable);
  * @param flag the flag to get
  * @return the value of the flag
  */
-bool cpu_getFlag(enum CPUStatusFlag flag);
+bool cpu_getFlag(CPUStatusFlag flag);
 
 /**
  * @brief Push value onto stack

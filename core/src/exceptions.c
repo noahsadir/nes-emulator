@@ -69,81 +69,70 @@ void exc_panic_stackUnderflow() {
     bus_triggerCPUPanic();
 }
 
-void exc_trace(int paramCount, char* redirectString, uint16_t address, uint16_t pc, char* instructionCode, uint8_t opcode, uint8_t firstParam, uint8_t secondParam, char* parameterString, uint16_t offsetAddress, uint8_t reg_a, uint8_t reg_status, uint8_t reg_x, uint8_t reg_y, uint8_t stackPointer, uint64_t cpuCycles, uint64_t ppuCycles, uint64_t ppuBlanks) {
+void exc_trace(Trace* trace) {
     
     if (fp == NULL)
     {
         //printf("Error opening file!\n");
         //exit(1);
         printf("");
-        printf("%04X ", pc);
+        printf("%04X ", trace->reg_pc);
         printf("%-1s", "");
-        printf("%02X ", opcode);
+        printf("%02X ", trace->opcode);
 
         
-        if (paramCount >= 1) {
-            printf("%02X ", firstParam);
+        if (trace->paramCount >= 1) {
+            printf("%02X ", trace->firstParam);
         } else {
             printf("%-3s", "");
         }
 
-        if (paramCount >= 2) {
-            printf("%02X ", secondParam);
+        if (trace->paramCount >= 2) {
+            printf("%02X ", trace->secondParam);
         } else {
             printf("%-3s", "");
         }
 
         printf("%-1s", "");
-        printf("%-4s %-8s", instructionCode, parameterString);
-
+        printf("%-4s %-8s", trace->instruction, trace->parameterString);
         
-        if (redirectString != NULL) {
-            printf("%-25s", redirectString);
-            //fprintf(fp, "%-20s", "");
-        } else {
-            printf("%-25s", "");
-        }
+        printf("%-25s", trace->redirectString);
 
-        printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X ", reg_a, reg_x, reg_y, reg_status, stackPointer);
+        printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X ", trace->reg_a, trace->reg_x, trace->reg_y, trace->reg_status, trace->stackPointer);
 
-        printf("PPU: %-3llu,%-3llu CYC:%llu", ppuBlanks, ppuCycles, cpuCycles);
+        printf("PPU: %-3llu,%-3llu CYC:%llu", trace->ppuBlanks, trace->ppuCycles, trace->cpuCycles);
         printf("\n");
         
     } else {
         setbuf(fp, NULL);
         
         fprintf(fp, "");
-        fprintf(fp, "%04X ", pc);
+        fprintf(fp, "%04X ", trace->reg_pc);
         fprintf(fp, "%-1s", "");
-        fprintf(fp, "%02X ", opcode);
+        fprintf(fp, "%02X ", trace->opcode);
 
         
-        if (paramCount >= 1) {
-            fprintf(fp, "%02X ", firstParam);
+        if (trace->paramCount >= 1) {
+            fprintf(fp, "%02X ", trace->firstParam);
         } else {
             fprintf(fp, "%-3s", "");
         }
 
-        if (paramCount >= 2) {
-            fprintf(fp, "%02X ", secondParam);
+        if (trace->paramCount >= 2) {
+            fprintf(fp, "%02X ", trace->secondParam);
         } else {
             fprintf(fp, "%-3s", "");
         }
 
         fprintf(fp, "%-1s", "");
-        fprintf(fp, "%-4s %-8s", instructionCode, parameterString);
+        fprintf(fp, "%-4s %-8s", trace->instruction, trace->parameterString);
 
         
-        if (redirectString != NULL) {
-            fprintf(fp, "%-25s", redirectString);
-            //fprintf(fp, "%-20s", "");
-        } else {
-            fprintf(fp, "%-25s", "");
-        }
+        fprintf(fp, "%-25s", trace->redirectString);
 
-        fprintf(fp, "A:%02X X:%02X Y:%02X P:%02X SP:%02X ", reg_a, reg_x, reg_y, reg_status, stackPointer);
+        fprintf(fp, "A:%02X X:%02X Y:%02X P:%02X SP:%02X ", trace->reg_a, trace->reg_x, trace->reg_y, trace->reg_status, trace->stackPointer);
 
-        fprintf(fp, "PPU: %-3llu,%-3llu CYC:%llu", ppuBlanks, ppuCycles, cpuCycles);
+        fprintf(fp, "PPU: %-3llu,%-3llu CYC:%llu", trace->ppuBlanks, trace->ppuCycles, trace->cpuCycles);
         fprintf(fp, "\n");
     }
 }

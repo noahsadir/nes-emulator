@@ -35,28 +35,42 @@ uint64_t cycles = 0;
 
 bool accumulatorAddrMode = false;
 bool didPanic = false;
-bool generateTrace = false;
 
-void cpu_init() {
+void(*writeMem)(uint16_t, uint8_t);
+uint8_t(*readMem)(uint16_t);
+Trace* tracePtr;
+
+void cpu_init(void(*w)(uint16_t, uint8_t), uint8_t(*r)(uint16_t), Trace* t) {
+    writeMem = w;
+    readMem = r;
+    tracePtr = t;
     cpu_reset();
-    
-    enum Instruction instruction = NOP;
-    
-    bus_startTimeMonitor();
-    while (instruction != BRK && reg_pc != 0xFFFD && !didPanic) {
-        uint64_t oldCycles = cycles;
-        instruction = cpu_execute();
-        bus_cpuReport(cycles - oldCycles);
-    }
-
-    bus_endTimeMonitor();
 }
 
-void cpu_vblankNMI() {
+Instruction cpu_execute(void(*c)(uint8_t)) {
+    if (didPanic) return BRK;
+    uint64_t oldCycles = cycles;
+    Instruction instruction = cpu_run_instruction();
+
+    #if (DEBUG_MODE)
+    tracePtr->cpuCycles = cycles;
+    tracePtr->ppuCycles = 0;
+    tracePtr->ppuBlanks = 0;
+    #endif
+
+    c(cycles - oldCycles);
+    return instruction;
+}
+
+void cpu_nmi() {
     cpu_stackPush16(reg_pc);
     cpu_stackPush(reg_status);
     cpu_setFlag(CPUSTAT_NO_INTRPT, true);
-    reg_pc = bus_readCPUAddr(0xFFFA);
+    reg_pc = cpu_readAddr(0xFFFA);
+}
+
+uint16_t cpu_readAddr(uint16_t address) {
+    return ((uint16_t) readMem(address + 1) << 8) | ((uint16_t) readMem(address));
 }
 
 uint64_t cpu_getCycles() {
@@ -67,7 +81,7 @@ void cpu_panic() {
     didPanic = true;
 }
 
-uint16_t cpu_fetchAddress(enum AddressingMode mode) {
+uint16_t cpu_fetchAddress(AddressingMode mode) {
     
     switch (mode) {
         case ADM_ACCUMULATOR:
@@ -86,15 +100,15 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
         }
         case ADM_ABSOLUTE:
         {
-            uint16_t address = bus_readCPU(reg_pc);
+            uint16_t address = readMem(reg_pc);
             reg_pc += 1;
-            address = (((uint16_t) bus_readCPU(reg_pc)) << 8) | address;
+            address = (((uint16_t) readMem(reg_pc)) << 8) | address;
             reg_pc += 1;
             return address;
         }
         case ADM_ZEROPAGE:
         {
-            uint16_t address = bus_readCPU(reg_pc);
+            uint16_t address = readMem(reg_pc);
             reg_pc += 1;
             address %= 256;
             return address;
@@ -105,41 +119,41 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
         }
         case ADM_ABS_INDIRECT:
         {
-            uint16_t initlow = bus_readCPU(reg_pc);
+            uint16_t initlow = readMem(reg_pc);
             reg_pc += 1;
-            uint16_t inithigh = bus_readCPU(reg_pc);
+            uint16_t inithigh = readMem(reg_pc);
             reg_pc += 1;
             inithigh = inithigh << 8;
 
             uint16_t low = (inithigh | initlow);
             uint16_t high = (inithigh | ((initlow + 1) % 256));
-            low = bus_readCPU(low);
-            high = bus_readCPU(high);
+            low = readMem(low);
+            high = readMem(high);
             high = high << 8;
             uint16_t address = (high | low);
             return address;
         }
         case ADM_ABS_X:
         {
-            uint16_t address = bus_readCPU(reg_pc);
+            uint16_t address = readMem(reg_pc);
             reg_pc += 1;
-            address = (bus_readCPU(reg_pc) << 8) | address;
+            address = (readMem(reg_pc) << 8) | address;
             reg_pc += 1;
             address += reg_x;
             return address;
         }
         case ADM_ABS_Y:
         {
-            uint16_t address = bus_readCPU(reg_pc);
+            uint16_t address = readMem(reg_pc);
             reg_pc += 1;
-            address = (bus_readCPU(reg_pc) << 8) | address;
+            address = (readMem(reg_pc) << 8) | address;
             reg_pc += 1;
             address += reg_y;
             return address;
         }
         case ADM_ZP_X:
         {
-            uint16_t address = bus_readCPU(reg_pc);
+            uint16_t address = readMem(reg_pc);
             reg_pc += 1;
             address += reg_x;
             address %= 256;
@@ -147,7 +161,7 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
         }
         case ADM_ZP_Y:
         {
-            uint16_t address = bus_readCPU(reg_pc);
+            uint16_t address = readMem(reg_pc);
             reg_pc += 1;
             address += reg_y;
             address %= 256;
@@ -155,13 +169,13 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
         }
         case ADM_ZP_INDIRECT_X:
         {
-            uint16_t address = bus_readCPU(reg_pc);
+            uint16_t address = readMem(reg_pc);
             reg_pc += 1;
             address += reg_x;
             address %= 256;
 
-            uint16_t low = bus_readCPU(address);
-            uint16_t high = bus_readCPU((address + 1) % 256);
+            uint16_t low = readMem(address);
+            uint16_t high = readMem((address + 1) % 256);
 
             high = high << 8;
             address = (high | low);
@@ -171,11 +185,11 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
         }
         case ADM_ZP_INDIRECT_Y:
         {
-            uint16_t address = bus_readCPU(reg_pc);
+            uint16_t address = readMem(reg_pc);
             reg_pc += 1;
 
-            uint16_t low = bus_readCPU(address);
-            uint16_t high = bus_readCPU((address + 1) % 256);
+            uint16_t low = readMem(address);
+            uint16_t high = readMem((address + 1) % 256);
 
             high = high << 8;
             address = (high | low);
@@ -188,7 +202,7 @@ uint16_t cpu_fetchAddress(enum AddressingMode mode) {
     return 0x0000;
 }
 
-void cpu_setFlag(enum CPUStatusFlag flag, bool enable) {
+void cpu_setFlag(CPUStatusFlag flag, bool enable) {
     if (enable) {
         reg_status |= flag;
     } else {
@@ -196,7 +210,7 @@ void cpu_setFlag(enum CPUStatusFlag flag, bool enable) {
     }
 }
 
-bool cpu_getFlag(enum CPUStatusFlag flag) {
+bool cpu_getFlag(CPUStatusFlag flag) {
     return (reg_status & flag) > 0;
 }
 
@@ -205,25 +219,28 @@ void cpu_reset() {
     reg_x = 0;
     reg_y = 0;
     reg_status = 0x24;
-    reg_pc = bus_readCPUAddr(0xFFFC);
+    reg_pc = cpu_readAddr(0xFFFC);
+    #if (DEBUG_MODE)
+    reg_pc = 0xC000;
+    #endif
     stackPointer = 0xFD;
 }
 
 void cpu_stackPush(uint8_t val) {
     if (stackPointer == 0x00) {
-        exc_panic_stackOverflow();
+        //exc_panic_stackOverflow();
     } else {
-        bus_writeCPU(0x100 + stackPointer, val);
+        writeMem(0x100 + stackPointer, val);
         stackPointer -= 1;
     }
 }
 
 uint8_t cpu_stackPull() {
     if (stackPointer == 0xFF) {
-        exc_panic_stackUnderflow();
+        //exc_panic_stackUnderflow();
     } else {
         stackPointer += 1;
-        uint8_t val = bus_readCPU(0x100 + stackPointer);
+        uint8_t val = readMem(0x100 + stackPointer);
         return val;
     }
     return 0;
@@ -231,27 +248,27 @@ uint8_t cpu_stackPull() {
 
 void cpu_stackPush16(uint16_t val) {
     if (stackPointer == 0x01) {
-        exc_panic_stackOverflow();
+        //exc_panic_stackOverflow();
     } else {
         uint8_t high = (val >> 8) & 0x00FF;
         uint8_t low = (val >> 0) & 0x00FF;
-        bus_writeCPU(0x100 + stackPointer, high);
+        writeMem(0x100 + stackPointer, high);
         stackPointer -= 1;
-        bus_writeCPU(0x100 + stackPointer, low);
+        writeMem(0x100 + stackPointer, low);
         stackPointer -= 1;
     }
 }
 
 uint16_t cpu_stackPull16() {
     if (stackPointer == 0xFE) {
-        exc_panic_stackUnderflow();
+        //exc_panic_stackUnderflow();
     } else {
 
         stackPointer += 1;
-        uint8_t low = bus_readCPU(0x100 + stackPointer);
+        uint8_t low = readMem(0x100 + stackPointer);
 
         stackPointer += 1;
-        uint8_t high = bus_readCPU(0x100 + stackPointer);
+        uint8_t high = readMem(0x100 + stackPointer);
 
         uint16_t addr = (((uint16_t) high) << 8) | ((uint16_t) low);
 
@@ -260,178 +277,188 @@ uint16_t cpu_stackPull16() {
     return 0;
 }
 
-void cpu_trace(enum Instruction instruction, enum AddressingMode mode, uint16_t address) {
-    char* instructionCode = cpu_getInstructionString(instruction);
-    uint8_t opcode = 0x00;
-    uint8_t firstParam = 0x00;
-    uint8_t secondParam = 0x00;
-    char parameterString[64];
-    char redirectString[64];
-    uint16_t offsetAddress = 0x0000;
-    uint16_t rewindPC = reg_pc - 1;
-    int paramCount = 0;
+Trace cpu_trace(Instruction instruction, AddressingMode mode, uint16_t address) {
+    Trace trace;
+    trace.opcode = 0x00;
+    trace.paramCount = 0;
+    
+    #if (DEBUG_MODE)
+    strcpy(trace.instruction, cpu_getInstructionString(instruction));
+    trace.firstParam = 0x00;
+    trace.secondParam = 0x00;
+    trace.offsetAddress = 0x0000;
+    trace.reg_pc = reg_pc - 1;
+    trace.paramCount = 0;
 
     switch (mode) {
         case ADM_ACCUMULATOR:
         {
-            rewindPC -= 0;
-            opcode = bus_readCPU(rewindPC);
-            sprintf(parameterString, "");
-            sprintf(redirectString, "");
-            paramCount = 0;
+            trace.reg_pc -= 0;
+            trace.opcode = readMem(trace.reg_pc);
+            sprintf(trace.parameterString, "");
+            sprintf(trace.redirectString, "");
+            trace.paramCount = 0;
             break;
         }
         case ADM_IMPLIED:
         {
-            rewindPC -= 0;
-            opcode = bus_readCPU(rewindPC);
-            sprintf(parameterString, "");
-            sprintf(redirectString, "");
-            paramCount = 0;
+            trace.reg_pc -= 0;
+            trace.opcode = readMem(trace.reg_pc);
+            sprintf(trace.parameterString, "");
+            sprintf(trace.redirectString, "");
+            trace.paramCount = 0;
             break;
         }
         case ADM_IMMEDIATE:
         {
-            rewindPC -= 1;
-            opcode = bus_readCPU(rewindPC);
-            uint8_t immediateVal = bus_readCPU(rewindPC + 1);
-            sprintf(parameterString, "#$%02X", immediateVal);
-            sprintf(redirectString, "");
-            firstParam = bus_readCPU(rewindPC + 1);
-            paramCount = 1;
+            trace.reg_pc -= 1;
+            trace.opcode = readMem(trace.reg_pc);
+            uint8_t immediateVal = readMem(trace.reg_pc + 1);
+            sprintf(trace.parameterString, "#$%02X", immediateVal);
+            sprintf(trace.redirectString, "");
+            trace.firstParam = readMem(trace.reg_pc + 1);
+            trace.paramCount = 1;
             break;
         }
         case ADM_ABSOLUTE:
         {
             
-            rewindPC -= 2;
-            opcode = bus_readCPU(rewindPC);
-            uint16_t absAddr = bus_readCPU(rewindPC + 1);
-            absAddr = (((uint16_t) bus_readCPU(rewindPC + 2)) << 8) | absAddr;
-            sprintf(parameterString, "$%04X", absAddr);
-            firstParam = bus_readCPU(rewindPC + 1);
-            secondParam = bus_readCPU(rewindPC + 2);
-            paramCount = 2;
-            sprintf(redirectString, "");
+            trace.reg_pc -= 2;
+            trace.opcode = readMem(trace.reg_pc);
+            uint16_t absAddr = readMem(trace.reg_pc + 1);
+            absAddr = (((uint16_t) readMem(trace.reg_pc + 2)) << 8) | absAddr;
+            sprintf(trace.parameterString, "$%04X", absAddr);
+            trace.firstParam = readMem(trace.reg_pc + 1);
+            trace.secondParam = readMem(trace.reg_pc + 2);
+            trace.paramCount = 2;
+            sprintf(trace.redirectString, "");
             break;
         }
         case ADM_ZEROPAGE:
         {
-            rewindPC -= 1;
-            opcode = bus_readCPU(rewindPC);
-            uint8_t zpAddr = bus_readCPU(rewindPC + 1);
-            sprintf(parameterString, "$%02X", zpAddr);
-            firstParam = bus_readCPU(rewindPC + 1);
-            paramCount = 1;
-            sprintf(redirectString, "= %02X", bus_readCPU(zpAddr));
+            trace.reg_pc -= 1;
+            trace.opcode = readMem(trace.reg_pc);
+            uint8_t zpAddr = readMem(trace.reg_pc + 1);
+            sprintf(trace.parameterString, "$%02X", zpAddr);
+            trace.firstParam = readMem(trace.reg_pc + 1);
+            trace.paramCount = 1;
+            sprintf(trace.redirectString, "= %02X", readMem(zpAddr));
             break;
         }
         case ADM_RELATIVE:
         {
-            rewindPC -= 0;
-            opcode = bus_readCPU(rewindPC);
-            int8_t offset = bus_readCPU(rewindPC + 1);
-            uint16_t relAddr = rewindPC + offset;
+            trace.reg_pc -= 0;
+            trace.opcode = readMem(trace.reg_pc);
+            int8_t offset = readMem(trace.reg_pc + 1);
+            uint16_t relAddr = trace.reg_pc + offset;
             relAddr += 2;
-            sprintf(parameterString, "$%04X", relAddr);
-            firstParam = bus_readCPU(rewindPC + 1);
-            paramCount = 1;
-            sprintf(redirectString, "");
+            sprintf(trace.parameterString, "$%04X", relAddr);
+            trace.firstParam = readMem(trace.reg_pc + 1);
+            trace.paramCount = 1;
+            sprintf(trace.redirectString, "");
             break;
         }
         case ADM_ABS_INDIRECT:
         {
-            rewindPC -= 2;
-            opcode = bus_readCPU(rewindPC);
-            uint16_t absAddr = bus_readCPU(rewindPC + 1);
-            absAddr = (((uint16_t) bus_readCPU(rewindPC + 2)) << 8) | absAddr;
-            sprintf(parameterString, "($%04X)", absAddr);
-            firstParam = bus_readCPU(rewindPC + 1);
-            secondParam = bus_readCPU(rewindPC + 2);
-            paramCount = 2;
-            sprintf(redirectString, "= %04X", address);
+            trace.reg_pc -= 2;
+            trace.opcode = readMem(trace.reg_pc);
+            uint16_t absAddr = readMem(trace.reg_pc + 1);
+            absAddr = (((uint16_t) readMem(trace.reg_pc + 2)) << 8) | absAddr;
+            sprintf(trace.parameterString, "($%04X)", absAddr);
+            trace.firstParam = readMem(trace.reg_pc + 1);
+            trace.secondParam = readMem(trace.reg_pc + 2);
+            trace.paramCount = 2;
+            sprintf(trace.redirectString, "= %04X", address);
             break;
         }
         case ADM_ABS_X:
         {
-            rewindPC -= 2;
-            opcode = bus_readCPU(rewindPC);
-            uint16_t absAddr = bus_readCPU(rewindPC + 1);
-            absAddr = (((uint16_t) bus_readCPU(rewindPC + 2)) << 8) | absAddr;
-            sprintf(parameterString, "$%04X,X", absAddr);
-            firstParam = bus_readCPU(rewindPC + 1);
-            secondParam = bus_readCPU(rewindPC + 2);
-            paramCount = 2;
-            sprintf(redirectString, "");
+            trace.reg_pc -= 2;
+            trace.opcode = readMem(trace.reg_pc);
+            uint16_t absAddr = readMem(trace.reg_pc + 1);
+            absAddr = (((uint16_t) readMem(trace.reg_pc + 2)) << 8) | absAddr;
+            sprintf(trace.parameterString, "$%04X,X", absAddr);
+            trace.firstParam = readMem(trace.reg_pc + 1);
+            trace.secondParam = readMem(trace.reg_pc + 2);
+            trace.paramCount = 2;
+            sprintf(trace.redirectString, "");
             break;
         }
         case ADM_ABS_Y:
         {
-            rewindPC -= 2;
-            opcode = bus_readCPU(rewindPC);
-            uint16_t absAddr = bus_readCPU(rewindPC + 1);
-            absAddr = (((uint16_t) bus_readCPU(rewindPC + 2)) << 8) | absAddr;
-            sprintf(parameterString, "$%04X,Y", absAddr);
-            firstParam = bus_readCPU(rewindPC + 1);
-            secondParam = bus_readCPU(rewindPC + 2);
-            paramCount = 2;
-            sprintf(redirectString, "");
+            trace.reg_pc -= 2;
+            trace.opcode = readMem(trace.reg_pc);
+            uint16_t absAddr = readMem(trace.reg_pc + 1);
+            absAddr = (((uint16_t) readMem(trace.reg_pc + 2)) << 8) | absAddr;
+            sprintf(trace.parameterString, "$%04X,Y", absAddr);
+            trace.firstParam = readMem(trace.reg_pc + 1);
+            trace.secondParam = readMem(trace.reg_pc + 2);
+            trace.paramCount = 2;
+            sprintf(trace.redirectString, "");
             break;
         }
         case ADM_ZP_X:
         {
-            rewindPC -= 1;
-            opcode = bus_readCPU(rewindPC);
-            uint8_t zpAddr = bus_readCPU(rewindPC + 1);
-            sprintf(parameterString, "$%02X,X", zpAddr);
-            firstParam = bus_readCPU(rewindPC + 1);
-            paramCount = 1;
-            sprintf(redirectString, "");
+            trace.reg_pc -= 1;
+            trace.opcode = readMem(trace.reg_pc);
+            uint8_t zpAddr = readMem(trace.reg_pc + 1);
+            sprintf(trace.parameterString, "$%02X,X", zpAddr);
+            trace.firstParam = readMem(trace.reg_pc + 1);
+            trace.paramCount = 1;
+            sprintf(trace.redirectString, "");
             break;
         }
         case ADM_ZP_Y:
         {
-            rewindPC -= 1;
-            opcode = bus_readCPU(rewindPC);
-            uint8_t zpAddr = bus_readCPU(rewindPC + 1);
-            sprintf(parameterString, "$%02X,Y", zpAddr);
-            firstParam = bus_readCPU(rewindPC + 1);
-            paramCount = 1;
-            sprintf(redirectString, "");
+            trace.reg_pc -= 1;
+            trace.opcode = readMem(trace.reg_pc);
+            uint8_t zpAddr = readMem(trace.reg_pc + 1);
+            sprintf(trace.parameterString, "$%02X,Y", zpAddr);
+            trace.firstParam = readMem(trace.reg_pc + 1);
+            trace.paramCount = 1;
+            sprintf(trace.redirectString, "");
             break;
         }
         case ADM_ZP_INDIRECT_X:
         {
-            rewindPC -= 1;
-            opcode = bus_readCPU(rewindPC);
-            uint8_t zpAddr = bus_readCPU(rewindPC + 1);
-            sprintf(parameterString, "($%02X,X)", zpAddr);
-            firstParam = bus_readCPU(rewindPC + 1);
-            paramCount = 1;
-            sprintf(redirectString, "@ %02X = %04X = %02X", (zpAddr + reg_x) % 256, address, bus_readCPU(address));
+            trace.reg_pc -= 1;
+            trace.opcode = readMem(trace.reg_pc);
+            uint8_t zpAddr = readMem(trace.reg_pc + 1);
+            sprintf(trace.parameterString, "($%02X,X)", zpAddr);
+            trace.firstParam = readMem(trace.reg_pc + 1);
+            trace.paramCount = 1;
+            sprintf(trace.redirectString, "@ %02X = %04X = %02X", (zpAddr + reg_x) % 256, address, readMem(address));
             break;
 
         }
         case ADM_ZP_INDIRECT_Y:
         {
-            rewindPC -= 1;
-            opcode = bus_readCPU(rewindPC);
-            uint8_t zpAddr = bus_readCPU(rewindPC + 1);
-            sprintf(parameterString, "($%02X),Y", zpAddr);
-            firstParam = bus_readCPU(rewindPC + 1);
-            paramCount = 1;
-            sprintf(redirectString, "= %04X @ %04X = %02X", (((uint16_t) bus_readCPU(zpAddr + 1)) << 8) | ((uint16_t) bus_readCPU(zpAddr)), address, bus_readCPU(address));
+            trace.reg_pc -= 1;
+            trace.opcode = readMem(trace.reg_pc);
+            uint8_t zpAddr = readMem(trace.reg_pc + 1);
+            sprintf(trace.parameterString, "($%02X),Y", zpAddr);
+            trace.firstParam = readMem(trace.reg_pc + 1);
+            trace.paramCount = 1;
+            sprintf(trace.redirectString, "= %04X @ %04X = %02X", (((uint16_t) readMem(zpAddr + 1)) << 8) | ((uint16_t) readMem(zpAddr)), address, readMem(address));
             break;
         }
     }
+    trace.reg_a = reg_accumulator;
+    trace.reg_x = reg_x;
+    trace.reg_y = reg_y;
+    trace.stackPointer = stackPointer;
+    #endif
 
-    exc_trace(paramCount, redirectString, address, rewindPC, instructionCode, opcode, firstParam, secondParam, parameterString, offsetAddress, reg_accumulator, reg_status, reg_x, reg_y, stackPointer, cycles, 0, 0);
+    return trace;
 }
 
-uint8_t cpu_instruction(enum Instruction instruction, enum AddressingMode mode) {
+uint8_t cpu_instruction(Instruction instruction, AddressingMode mode) {
     uint16_t address = cpu_fetchAddress(mode);
     
-    if (generateTrace) cpu_trace(instruction, mode, address);
+
+    #if (DEBUG_MODE)
+    *tracePtr = cpu_trace(instruction, mode, address);
+    #endif
     
     switch (instruction) {
         case LDA: return cpu_lda(address);
@@ -516,9 +543,9 @@ uint8_t cpu_instruction(enum Instruction instruction, enum AddressingMode mode) 
     return NOP;
 }
 
-uint8_t cpu_execute() {
+uint8_t cpu_run_instruction() {
 
-    uint8_t opcode = bus_readCPU(reg_pc);
+    uint8_t opcode = readMem(reg_pc);
     reg_pc += 1;
     
     switch (opcode) {
@@ -859,7 +886,7 @@ uint8_t cpu_execute() {
         
         // Other
         default: 
-            exc_panic_illegalInstruction(opcode);
+            //exc_panic_illegalInstruction(opcode);
             break;
     }
 
@@ -867,43 +894,43 @@ uint8_t cpu_execute() {
 }
 
 uint8_t cpu_lda(uint16_t address) {
-    reg_accumulator = bus_readCPU(address);
+    reg_accumulator = readMem(address);
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return LDA;
 }
 
 uint8_t cpu_ldx(uint16_t address) {
-    reg_x = bus_readCPU(address);
+    reg_x = readMem(address);
     cpu_setFlag(CPUSTAT_ZERO, reg_x == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_x & 0b10000000) != 0);
     return LDX;
 }
 
 uint8_t cpu_ldy(uint16_t address) {
-    reg_y = bus_readCPU(address);
+    reg_y = readMem(address);
     cpu_setFlag(CPUSTAT_ZERO, reg_y == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_y & 0b10000000) != 0);
     return LDY;
 }
 
 uint8_t cpu_sta(uint16_t address) {
-    bus_writeCPU(address, reg_accumulator);
+    writeMem(address, reg_accumulator);
     return STA;
 }
 
 uint8_t cpu_stx(uint16_t address) {
-    bus_writeCPU(address, reg_x);
+    writeMem(address, reg_x);
     return STX;
 }
 
 uint8_t cpu_sty(uint16_t address) {
-    bus_writeCPU(address, reg_y);
+    writeMem(address, reg_y);
     return STY;
 }
 
 uint8_t cpu_adc(uint16_t address) {
-    uint8_t memoryVal = bus_readCPU(address);
+    uint8_t memoryVal = readMem(address);
     uint16_t sum = reg_accumulator + memoryVal + ((uint16_t) cpu_getFlag(CPUSTAT_CARRY));
     cpu_setFlag(CPUSTAT_CARRY, sum > 0xFF);
     cpu_setFlag(CPUSTAT_OVERFLOW, (reg_accumulator ^ sum) & (memoryVal ^ sum) & 0x80);
@@ -914,7 +941,7 @@ uint8_t cpu_adc(uint16_t address) {
 }
 
 uint8_t cpu_sbc(uint16_t address) {
-    uint8_t memoryVal = ~bus_readCPU(address);
+    uint8_t memoryVal = ~readMem(address);
     uint16_t sum = reg_accumulator + memoryVal + ((uint16_t) cpu_getFlag(CPUSTAT_CARRY));
     cpu_setFlag(CPUSTAT_CARRY, sum > 0xFF);
     cpu_setFlag(CPUSTAT_OVERFLOW, (reg_accumulator ^ sum) & (memoryVal ^ sum) & 0x80);
@@ -925,8 +952,8 @@ uint8_t cpu_sbc(uint16_t address) {
 }
 
 uint8_t cpu_inc(uint16_t address) {
-    uint8_t val = bus_readCPU(address) + 1;
-    bus_writeCPU(address, val);
+    uint8_t val = readMem(address) + 1;
+    writeMem(address, val);
     cpu_setFlag(CPUSTAT_ZERO, val == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (val & 0b10000000) != 0);
     return INC;
@@ -947,8 +974,8 @@ uint8_t cpu_iny() {
 }
 
 uint8_t cpu_dec(uint16_t address) {
-    uint8_t val = bus_readCPU(address) - 1;
-    bus_writeCPU(address, val);
+    uint8_t val = readMem(address) - 1;
+    writeMem(address, val);
     cpu_setFlag(CPUSTAT_ZERO, val == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (val & 0b10000000) != 0);
     return DEC;
@@ -971,7 +998,7 @@ uint8_t cpu_dey() {
 uint8_t cpu_asl(uint16_t address) {
     uint8_t storedVal = reg_accumulator;
     if (!accumulatorAddrMode) {
-        storedVal = bus_readCPU(address);
+        storedVal = readMem(address);
     }
 
     cpu_setFlag(CPUSTAT_CARRY, (storedVal >> 7) & 1);
@@ -983,7 +1010,7 @@ uint8_t cpu_asl(uint16_t address) {
     if (accumulatorAddrMode) {
         reg_accumulator = storedVal;
     } else {
-        bus_writeCPU(address, storedVal);
+        writeMem(address, storedVal);
     }
 
     accumulatorAddrMode = false;
@@ -993,7 +1020,7 @@ uint8_t cpu_asl(uint16_t address) {
 uint8_t cpu_lsr(uint16_t address) {
     uint8_t storedVal = reg_accumulator;
     if (!accumulatorAddrMode) {
-        storedVal = bus_readCPU(address);
+        storedVal = readMem(address);
     }
 
     cpu_setFlag(CPUSTAT_CARRY, storedVal & 1);
@@ -1005,7 +1032,7 @@ uint8_t cpu_lsr(uint16_t address) {
     if (accumulatorAddrMode) {
         reg_accumulator = storedVal;
     } else {
-        bus_writeCPU(address, storedVal);
+        writeMem(address, storedVal);
     }
 
     accumulatorAddrMode = false;
@@ -1015,7 +1042,7 @@ uint8_t cpu_lsr(uint16_t address) {
 uint8_t cpu_rol(uint16_t address) {
     uint8_t storedVal = reg_accumulator;
     if (!accumulatorAddrMode) {
-        storedVal = bus_readCPU(address);
+        storedVal = readMem(address);
     }
     
 
@@ -1030,7 +1057,7 @@ uint8_t cpu_rol(uint16_t address) {
     if (accumulatorAddrMode) {
         reg_accumulator = storedVal;
     } else {
-        bus_writeCPU(address, storedVal);
+        writeMem(address, storedVal);
     }
 
     accumulatorAddrMode = false;
@@ -1040,7 +1067,7 @@ uint8_t cpu_rol(uint16_t address) {
 uint8_t cpu_ror(uint16_t address) {
     uint8_t storedVal = reg_accumulator;
     if (!accumulatorAddrMode) {
-        storedVal = bus_readCPU(address);
+        storedVal = readMem(address);
     }
 
     bool oldCarry = cpu_getFlag(CPUSTAT_CARRY);
@@ -1054,7 +1081,7 @@ uint8_t cpu_ror(uint16_t address) {
     if (accumulatorAddrMode) {
         reg_accumulator = storedVal;
     } else {
-        bus_writeCPU(address, storedVal);
+        writeMem(address, storedVal);
         
     }
 
@@ -1063,21 +1090,21 @@ uint8_t cpu_ror(uint16_t address) {
 }
 
 uint8_t cpu_and(uint16_t address) {
-    reg_accumulator = bus_readCPU(address) & reg_accumulator;
+    reg_accumulator = readMem(address) & reg_accumulator;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return AND;
 }
 
 uint8_t cpu_ora(uint16_t address) {
-    reg_accumulator = bus_readCPU(address) | reg_accumulator;
+    reg_accumulator = readMem(address) | reg_accumulator;
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
     return ORA;
 }
 
 uint8_t cpu_eor(uint16_t address) {
-    reg_accumulator = bus_readCPU(address) ^ reg_accumulator;
+    reg_accumulator = readMem(address) ^ reg_accumulator;
     
     cpu_setFlag(CPUSTAT_ZERO, reg_accumulator == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (reg_accumulator & 0b10000000) != 0);
@@ -1085,7 +1112,7 @@ uint8_t cpu_eor(uint16_t address) {
 }
 
 uint8_t cpu_cmp(uint16_t address) {
-    uint8_t memVal = bus_readCPU(address);
+    uint8_t memVal = readMem(address);
 
     int8_t signedResult = ((int8_t) reg_accumulator) - ((int8_t) memVal);
     if (reg_accumulator < memVal) {
@@ -1104,7 +1131,7 @@ uint8_t cpu_cmp(uint16_t address) {
 }
 
 uint8_t cpu_cpx(uint16_t address) {
-    uint8_t memVal = bus_readCPU(address);
+    uint8_t memVal = readMem(address);
 
     int8_t signedResult = ((int8_t) reg_x) - ((int8_t) memVal);
     if (reg_x < memVal) {
@@ -1123,7 +1150,7 @@ uint8_t cpu_cpx(uint16_t address) {
 }
 
 uint8_t cpu_cpy(uint16_t address) {
-    uint8_t memVal = bus_readCPU(address);
+    uint8_t memVal = readMem(address);
 
     int8_t signedResult = ((int8_t) reg_y) - ((int8_t) memVal);
     if (reg_y < memVal) {
@@ -1142,16 +1169,16 @@ uint8_t cpu_cpy(uint16_t address) {
 }
 
 uint8_t cpu_bit(uint16_t address) {
-    uint8_t memVal = bus_readCPU(address);
+    uint8_t memVal = readMem(address);
     cpu_setFlag(CPUSTAT_ZERO, (reg_accumulator & memVal) == 0);
     cpu_setFlag(CPUSTAT_NEGATIVE, (memVal & 0b10000000) != 0);
     cpu_setFlag(CPUSTAT_OVERFLOW, (memVal & 0b01000000) != 0);
     return BIT;
 }
 
-void cpu_branchHelper(bool desiredResult, enum CPUStatusFlag flag) {
+void cpu_branchHelper(bool desiredResult, CPUStatusFlag flag) {
     if (cpu_getFlag(flag) == desiredResult) {
-        int8_t offset = (bus_readCPU(reg_pc));
+        int8_t offset = (readMem(reg_pc));
         reg_pc += offset;
         reg_pc += 1;
     } else {
@@ -1341,7 +1368,7 @@ uint8_t cpu_illegal_alr(uint16_t address) {
 
 uint8_t cpu_illegal_anc(uint16_t address) {
     cpu_and(address);
-    cpu_setFlag(CPUSTAT_CARRY, (bus_readCPU(address) >> 7) & 1);
+    cpu_setFlag(CPUSTAT_CARRY, (readMem(address) >> 7) & 1);
     return IL_ANC;
 }
 
@@ -1382,7 +1409,7 @@ uint8_t cpu_illegal_lax(uint16_t address) {
 }
 
 uint8_t cpu_illegal_lxa(uint16_t address) {
-    reg_accumulator = (rand() % 256) & bus_readCPU(address);
+    reg_accumulator = (rand() % 256) & readMem(address);
     reg_x = reg_accumulator;
     
     return IL_LXA;
@@ -1401,13 +1428,13 @@ uint8_t cpu_illegal_rra(uint16_t address) {
 }
 
 uint8_t cpu_illegal_sax(uint16_t address) {
-    bus_writeCPU(address, reg_accumulator & reg_x);
+    writeMem(address, reg_accumulator & reg_x);
     
     return IL_SAX;
 }
 
 uint8_t cpu_illegal_sbx(uint16_t address) {
-    uint8_t memVal = bus_readCPU(address);
+    uint8_t memVal = readMem(address);
     uint8_t cmpVal = reg_accumulator & reg_x;
     
 
@@ -1430,9 +1457,9 @@ uint8_t cpu_illegal_sbx(uint16_t address) {
 uint8_t cpu_illegal_sha(uint16_t address) {
     // programmed instability
     if (rand() % 4 == 0) {
-        bus_writeCPU(address, reg_accumulator & reg_x);
+        writeMem(address, reg_accumulator & reg_x);
     } else {
-        bus_writeCPU(address, reg_accumulator & reg_x & ((bus_readCPU(address) >> 8) + 1));
+        writeMem(address, reg_accumulator & reg_x & ((readMem(address) >> 8) + 1));
     }
     
     return IL_SHA;
@@ -1441,9 +1468,9 @@ uint8_t cpu_illegal_sha(uint16_t address) {
 uint8_t cpu_illegal_shx(uint16_t address) {
     // programmed instability
     if (rand() % 4 == 0) {
-        bus_writeCPU(address, reg_x);
+        writeMem(address, reg_x);
     } else {
-        bus_writeCPU(address, reg_x & ((bus_readCPU(address) >> 8) + 1));
+        writeMem(address, reg_x & ((readMem(address) >> 8) + 1));
     }
     
     return IL_SHX;
@@ -1452,9 +1479,9 @@ uint8_t cpu_illegal_shx(uint16_t address) {
 uint8_t cpu_illegal_shy(uint16_t address) {
     // programmed instability
     if (rand() % 4 == 0) {
-        bus_writeCPU(address, reg_y);
+        writeMem(address, reg_y);
     } else {
-        bus_writeCPU(address, reg_y & ((bus_readCPU(address) >> 8) + 1));
+        writeMem(address, reg_y & ((readMem(address) >> 8) + 1));
     }
     
     return IL_SHY;
@@ -1476,9 +1503,9 @@ uint8_t cpu_illegal_tas(uint16_t address) {
     stackPointer = reg_accumulator & reg_x;
     // programmed instability
     if (rand() % 4 == 0) {
-        bus_writeCPU(address, reg_accumulator & reg_x);
+        writeMem(address, reg_accumulator & reg_x);
     } else {
-        bus_writeCPU(address, reg_accumulator & reg_x & ((bus_readCPU(address) >> 8) + 1));
+        writeMem(address, reg_accumulator & reg_x & ((readMem(address) >> 8) + 1));
     }
     
     return IL_TAS;
@@ -1498,7 +1525,7 @@ uint8_t cpu_illegal_nop(uint16_t address) {
     return IL_NOP;
 }
 
-char* cpu_getInstructionString(enum Instruction instruction) {
+char* cpu_getInstructionString(Instruction instruction) {
     switch (instruction) {
         case LDA: return "LDA";
         case LDX: return "LDX";

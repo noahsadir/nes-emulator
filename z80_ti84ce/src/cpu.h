@@ -107,7 +107,7 @@ void cpu_reset();
  * 
  * @return uint8_t the number of cycles elapsed
  */
-uint8_t cpu_execute();
+uint8_t cpu_run_instruction();
 
 /*
  * No need for documentation; you know what these do.

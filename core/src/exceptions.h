@@ -30,10 +30,13 @@
 #define EXCEPTIONS_H
 
 #include "bus.h"
+#include "cpu.h"
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+
+#if (DEBUG_MODE)
 
 /**
  * @brief Initialize CPU trace functionality
@@ -77,17 +80,14 @@ void exc_panic_illegalInstruction(uint8_t opcode);
  * 
  * Too many parameters, most are self-explanatory
  */
-void exc_trace(int paramCount, char* redirectString, uint16_t address,
-    uint16_t pc, char* instructionCode, uint8_t opcode, uint8_t firstParam,
-    uint8_t secondParam, char* parameterString, uint16_t offsetAddress,
-    uint8_t reg_a, uint8_t reg_status, uint8_t reg_x, uint8_t reg_y,
-    uint8_t stackPointer, uint64_t cpuCycles, uint64_t ppuCycles,
-    uint64_t ppuBlanks);
+void exc_trace(Trace* trace);
 
 void exc_message(char* message);
 
 void exc_panic_stackOverflow();
 
 void exc_panic_stackUnderflow();
+
+#endif
 
 #endif

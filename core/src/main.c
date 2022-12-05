@@ -92,12 +92,12 @@ void loadROM(char* path) {
         printf(isPAL ? "PAL" : "NTSC");
         printf("\n");
     } else {
-        exc_panic("INES READ ERROR (invalid header)");
+        printf(" ** INES READ ERROR (invalid header) **\n");
         exit(1);
     }
 
     if (mapper != 0) {
-        exc_panic("UNSUPPORTED MAPPER");
+        printf(" ** UNSUPPORTED MAPPER **\n");
         exit(1);
     }
 
@@ -126,7 +126,7 @@ void loadROM(char* path) {
 
         printf("\n\n");
     } else {
-        exc_panic("INES READ ERROR (invalid PRG ROM)");
+        printf(" ** INES READ ERROR (invalid PRG ROM) **\n");
         exit(1);
     }
 
@@ -137,14 +137,13 @@ void loadROM(char* path) {
         }
         printf("\n\n");
     } else {
-        exc_panic("INES READ ERROR (invalid CHR ROM)");
+        printf(" ** INES READ ERROR (invalid CHR ROM) **\n");
         exit(1);
     }
 
     bus_loadPRGROM(prgROM, prgROMSize);
     bus_loadCHRROM(chrROM, chrROMSize);
 
-    exc_traceInit();
     bus_initPPU();
     bus_initDisplay();
     bus_initCPU(); // MUST be initialized last, since it will begin a loop

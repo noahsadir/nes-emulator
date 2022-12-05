@@ -94,7 +94,7 @@ void io_update(uint32_t* bitmap) {
         }
 
         if (event.type == SDL_QUIT) {
-            cpu_panic();
+            bus_triggerCPUPanic();
         }
     }
 

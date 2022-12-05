@@ -29,6 +29,11 @@
 #ifndef BUS_H
 #define BUS_H
 
+#define CPU_CLOCK_SPEED 1789773
+#define CPU_FRAME_CLOCKS 29780
+#define FRAMERATE 60
+#define USEC_PER_FRAME (1000000 / FRAMERATE)
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/time.h>
@@ -39,6 +44,12 @@
 #include "io.h"
 #include "joypad.h"
 #include "exceptions.h"
+
+typedef enum {
+  SYNC_SOUND,
+  SYNC_REALTIME,
+  SYNC_DISABLED
+} SyncMode;
 
 /* INITIALIZATION METHODS */
 
@@ -57,6 +68,8 @@ void bus_initPPU();
  * 
  */
 void bus_initDisplay();
+
+void bus_initClock();
 
 /**
  * @brief Set location of the PRG ROM
@@ -140,26 +153,7 @@ void bus_unsetJoypad(enum JoypadButton button);
 
 /* MONITORS */
 
-/**
- * @brief Start monitoring time.
- */
-void bus_startTimeMonitor();
-
-/**
- * @brief Report time (in microseconds) since call to
- *        bus_startTimeMonitor()
- * 
- * @return uint64_t the elapsed time
- */
-uint64_t bus_endTimeMonitor();
-
-/**
- * @brief Report time (in microseconds) since call to
- *        bus_startTimeMonitor()
- * 
- * @return uint64_t the elapsed time
- */
-uint64_t bus_pollTimeMonitor();
+void bus_frameIntervalReport();
 
 /* CALLBACKS */
 
@@ -176,6 +170,8 @@ void bus_cpuReport(uint8_t cycleCount);
  * @param bitmap the display bitmap
  */
 void bus_ppuReport(uint32_t* bitmap);
+
+void bus_cpuKillReport();
 
 /* TRIGGERS */
 
