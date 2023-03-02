@@ -2,13 +2,21 @@
 
 A **very** basic NES Emulator written entirely in C, with portability in mind.
 
+#### 03/01/2023 Update
+
+I'm currently rewriting large portions of this emulator to make it less hacky.
+
+Because of this, there may be a disconnect between the documentation and the source code, along with lots of other quirks.
+
 #### Quick Note
 
 I mostly wrote this for fun, and it certainly isn't near feature complete.
 
 #### Another Note
 
-The details below pertain to the core emulator. The Z80 port was done out of sheer curiosity and is not being actively worked on.
+~The details below pertain to the core emulator. The Z80 port was done out of sheer curiosity and is not being actively worked on.~
+
+I removed the separate Z80 port, but may add support for other platforms in a more unified manner. This includes a TI-84 CE port that will presumably run at <1 FPS.
 
 #### Dependencies
 - SDL2
@@ -39,13 +47,14 @@ The source files have some inline comments, but most of the documentation is loc
 
 From my own testing, the CPU implementation is fairly robust. The only thing missing is the implementation of the decimal flag, which I may implement in the future. Additionally, it is NOT cycle accurate but it isn't too far off.
 
-The CPU was written with readability in mind. Thus, there is quite a bit of repeated code for similar instructions (e.g. INX, INY, DEX, DEY).
+The CPU code is essentially blind to the rest of the emulator and could theoretically be used for other 6502-based systems.
 
-After each instruction, the CPU calls `bus_cpuReport(uint8_t)`, witht the parameter being the number of cycles elapsed.
+It also has the ability to disassemble programs!
 
 #### Todo
 - Cycle accuracy (account for page crosses)
 - Decimal Flag
+- Illegal instructions
 
 ### PPU
 
@@ -68,11 +77,13 @@ Not implemented yet.
 #### Todo
 - Implement
 
-### Bus
+### Bus (aka NES System)
 
-This was originally supposed to represent the CPU bus, but ended up being the communication layer between all of the emulated hardware components. So it's really more of a motherboard implementation (which includes the busses, of course).
+`bus.c` essentially acts as a bus in the sense that it connects all the components and allows them to interact with each other.
 
 Since I wanted to maximize portability, most of the platform specific dependencies are done through this class. Addtionally, the hardware classes should not communicate with each other, but rather pass communications through `bus.c`.
+
+Additionally, `bus.c` performs most of the NES-specific code so that other components, such as I/O and CPU, could theoretically be used to emulate other systems.
 
 #### Todo
 - Support for basic mappers
@@ -81,7 +92,7 @@ Since I wanted to maximize portability, most of the platform specific dependenci
 
 The emulator supports one joypad whose buttons are mapped to the keyboard.
 
-Currently, the mapping is hardcoded in `bus.c`.
+Currently, the mapping is hardcoded in `io.c`.
 
 Again, due to the focus on portability, the joypad does not interact with the keyboard directly. Rather, the bus feeds keyboard input into the joypad.
 
@@ -99,7 +110,7 @@ The following diagram shows how each of the classes communicate with each other.
           |  |     
 [MAIN]--->[BUS]<--->[CPU]
           |  |   
-          |  |----->[JOYPAD]
+          |  |----->[I/O]
           |  |<--------|
           |
           |-------->[EXCEPTIONS]

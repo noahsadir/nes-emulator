@@ -1,6 +1,4 @@
-# NES Emulator (Core)
-
-This folder contains the source code necessary for the emulator itself.
+# How to get this thing working
 
 ## Compile
 
