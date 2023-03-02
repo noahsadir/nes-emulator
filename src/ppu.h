@@ -29,7 +29,7 @@
 #ifndef PPU_H
 #define PPU_H
 
-#include "bus.h"
+#include "globalflags.h"
 #include "chars.h"
 
 #include <stdint.h>
@@ -117,7 +117,7 @@ static const uint32_t ppu_colors2[64] = {
  * @param vram the pointer to the VRAM
  * @param crom the pointer to the CHR ROM
  */
-void ppu_init(uint8_t* vram, uint8_t* crom);
+void ppu_init(uint8_t* crom, bool vmirror, uint8_t(*r)(uint16_t), void(*c)(uint32_t*));
 
 /**
  * 
@@ -257,5 +257,21 @@ void ppu_setPixel(uint32_t color, int16_t x, int16_t y);
  * @param y the scanline to draw
  */
 void ppu_drawScanline(uint8_t y);
+
+/**
+ * @brief Perform read operation at mapped address
+ * 
+ * @param address the address to read
+ * @return uint8_t the data from the specified address
+ */
+uint8_t ppu_readMem(uint16_t address);
+
+/**
+ * @brief Perform write operation at mapped address
+ * 
+ * @param address the address to write to
+ * @param data the data to write
+ */
+void ppu_writeMem(uint16_t address, uint8_t data);
 
 #endif
