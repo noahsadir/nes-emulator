@@ -29,10 +29,10 @@
 #ifndef JOYPAD_H
 #define JOYPAD_H
 
+#include "globalflags.h"
 #include <stdint.h>
-#include <stdbool.h>
 
-enum JoypadButton {
+typedef enum {
     JP_RIGHT   = 0b10000000,
     JP_LEFT    = 0b01000000,
     JP_DOWN    = 0b00100000,
@@ -41,7 +41,8 @@ enum JoypadButton {
     JP_SELECT  = 0b00000100,
     JP_BTN_B   = 0b00000010,
     JP_BTN_A   = 0b00000001,
-};
+    JP_NULL    = 0b00000000
+} JoypadButton;
 
 /**
  * @brief Read button value from joypad
@@ -62,13 +63,13 @@ void joypad_write(uint8_t val);
  * 
  * @param button the button to set
  */
-void joypad_setButton(enum JoypadButton button);
+void joypad_setButton(JoypadButton button);
 
 /**
  * @brief Unset a button on the joypad
  * 
  * @param button the button to unset
  */
-void joypad_unsetButton(enum JoypadButton button);
+void joypad_unsetButton(JoypadButton button);
 
 #endif

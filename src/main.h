@@ -3,7 +3,7 @@
  * @author Noah Sadir (development.noahsadir@gmail.com)
  * @brief Main driver program for NES emulator
  * @version 1.0
- * @date 2022-07-06
+ * @date 2022-12-20
  * 
  * @copyright Copyright (c) 2022 Noah Sadir
  * 
@@ -26,27 +26,38 @@
  * IN THE SOFTWARE.
  */
 
+#ifndef MAIN_H
+#define MAIN_H
+
+#include "globalflags.h"
 #include "bus.h"
-#include "exceptions.h"
 
-#include <fcntl.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <stdint.h>
-#include <stdbool.h>
+#include <stdlib.h>
 
 /**
- * @brief Load an iNES ROM file and initialize hardware
+ * @brief Load a ROM from the specified path
  * 
- * @param path the file path of the iNES ROM file
+ * @param path the file path
+ * @param fp the file pointer
+ * @return true if the file was opened successfully
+ * @return false upon failure
  */
-void loadROM(char* path);
+bool main_loadROM(char* path, FileBinary* binary);
 
 /**
- * @brief Main entry point of program
- * 
- * @param argc argument count
- * @param argv argumnet strings
+ * @brief Compare generated vs correct CPU traces.
+ */
+void main_compareCPUTraces();
+
+/**
+ * @brief Main entry point of the program.
+ *
+ * @param argc the number of args
+ * @param argv the contents of args
  * @return int the exit status
  */
 int main(int argc, char* argv[]);
+
+#endif

@@ -42,12 +42,12 @@ void joypad_write(uint8_t val) {
     if (strobe) buttonIndex = 0;
 }
 
-void joypad_setButton(enum JoypadButton button) {
+void joypad_setButton(JoypadButton button) {
     buttonStatus = buttonStatus | ((uint8_t) button);
     
 }
 
-void joypad_unsetButton(enum JoypadButton button) {
+void joypad_unsetButton(JoypadButton button) {
     buttonStatus = buttonStatus & ~((uint8_t) button);
 }
 

@@ -11,3 +11,5 @@ obj
 cpu_opt_attempt.c
 cpu_opt_attempt.h
 debug
+v2
+v1

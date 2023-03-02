@@ -29,21 +29,15 @@
 #ifndef BUS_H
 #define BUS_H
 
-#define CPU_CLOCK_SPEED 1789773
-#define CPU_FRAME_CLOCKS 29780
-#define FRAMERATE 60
-#define USEC_PER_FRAME (1000000 / FRAMERATE)
-
 #include <stdint.h>
-#include <stdbool.h>
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "cpu.h"
+#include "globalflags.h"
+#include "cpu6502.h"
 #include "ppu.h"
 #include "io.h"
 #include "joypad.h"
-#include "exceptions.h"
 
 typedef enum {
   SYNC_SOUND,
@@ -51,12 +45,44 @@ typedef enum {
   SYNC_DISABLED
 } SyncMode;
 
+typedef enum {
+  MIRRORING_HORIZONTAL  = 0,
+  MIRRORING_VERTICAL    = 1
+} MirroringType;
+
+typedef enum {
+  TV_NTSC  = 0,
+  TV_PAL   = 1
+} TVSystem;
+
+typedef struct {
+  uint8_t prgRomSize;
+  uint8_t chrRomSize;
+  MirroringType mirroringType;
+  bool containsPrgRam;
+  bool containsTrainer;
+  bool ignoreMirroringControl;
+  bool isVSUnisystem;
+  bool isPlayChoice10;
+  uint8_t mapperNumber;
+  uint8_t prgRamSize;
+  TVSystem tvSystem;
+} HeaderINES;
+
+typedef struct {
+  HeaderINES header;
+  uint8_t* trainer;
+  uint8_t* prgRom;
+  uint8_t* chrRom;
+  uint8_t* instRom;
+  uint8_t* pRom;
+} INES;
+
 /* INITIALIZATION METHODS */
 
-/**
- * @brief Initialize the CPU
- */
-void bus_initCPU();
+void bus_init(FileBinary* bin);
+
+bool bus_parseROM(FileBinary* bin);
 
 /**
  * @brief Initialize the PPU
@@ -64,28 +90,10 @@ void bus_initCPU();
 void bus_initPPU();
 
 /**
- * @brief Initialize the display
+ * @brief Initialize the clock
  * 
  */
-void bus_initDisplay();
-
 void bus_initClock();
-
-/**
- * @brief Set location of the PRG ROM
- * 
- * @param romData_PTR the pointer to the PRG ROM
- * @param romSize the size of the PRG ROM
- */
-void bus_loadPRGROM(uint8_t* romData_PTR, uint16_t romSize);
-
-/**
- * @brief Set location of the CHR ROM
- * 
- * @param romData_PTR the pointer to the PRG ROM
- * @param romSize the size of the PRG ROM
- */
-void bus_loadCHRROM(uint8_t* romData_PTR, uint16_t romSize);
 
 /* DATA METHODS */
 
@@ -104,6 +112,22 @@ uint8_t bus_readCPU(uint16_t address);
  * @param data the data to write
  */
 void bus_writeCPU(uint16_t address, uint8_t data);
+
+/**
+ * @brief Write cartridge data based on mapper value
+ * 
+ * @param addr the address to write to
+ * @param data the data to write
+ */
+void bus_cartridgeWrite(uint16_t addr, uint8_t data);
+
+/**
+ * @brief Read cartridge data based on mapper value
+ * 
+ * @param addr the address to read from
+ * @return uint8_t the data contained at the address
+ */
+uint8_t bus_cartridgeRead(uint16_t addr);
 
 /**
  * @brief Perform 16-bit read operation at mapped address
@@ -142,14 +166,14 @@ void bus_writePPU(uint16_t address, uint8_t data);
  * 
  * @param button the button to set
  */
-void bus_setJoypad(enum JoypadButton button);
+void bus_setJoypad(JoypadButton button);
 
 /**
  * @brief Unset a button on the joypad
  * 
  * @param button the button to unset
  */
-void bus_unsetJoypad(enum JoypadButton button);
+void bus_unsetJoypad(JoypadButton button);
 
 /* MONITORS */
 
@@ -169,7 +193,9 @@ void bus_cpuReport(uint8_t cycleCount);
  * 
  * @param bitmap the display bitmap
  */
-void bus_ppuReport(uint32_t* bitmap);
+void bus_ppuReport();
+
+void bus_handleInput(NESInput input, bool enabled);
 
 void bus_cpuKillReport();
 

@@ -1,9 +1,9 @@
 /**
- * @file exceptions.h
+ * @file io.h
  * @author Noah Sadir (development.noahsadir@gmail.com)
- * @brief Display feedback for debugging and troubleshooting.
+ * @brief Link abstract emulator implementation to host hardware
  * @version 1.0
- * @date 2022-07-03
+ * @date 2022-12-20
  * 
  * @copyright Copyright (c) 2022 Noah Sadir
  * 
@@ -26,68 +26,78 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef EXCEPTIONS_H
-#define EXCEPTIONS_H
+#ifndef IO_H
+#define IO_H
 
-#include "bus.h"
-#include "cpu.h"
+#include "globalflags.h"
+#include "font.h"
 
+#include <SDL2/SDL.h>
 #include <stdint.h>
-#include <stdbool.h>
-#include <stdlib.h>
 
-#if (DEBUG_MODE)
+struct JoypadMapping {
+    SDL_KeyCode up;
+    SDL_KeyCode down;
+    SDL_KeyCode left;
+    SDL_KeyCode right;
+    SDL_KeyCode a;
+    SDL_KeyCode b;
+    SDL_KeyCode select;
+    SDL_KeyCode start;
+};
+
+typedef enum {
+  INPUT_UP      = 0x0,
+  INPUT_DOWN    = 0x1,
+  INPUT_LEFT    = 0x2,
+  INPUT_RIGHT   = 0x3,
+  INPUT_A       = 0x4,
+  INPUT_B       = 0x5,
+  INPUT_SELECT  = 0x6,
+  INPUT_START   = 0x7,
+  INPUT_QUIT    = 0x8
+} NESInput;
 
 /**
- * @brief Initialize CPU trace functionality
+ * @brief Initialize I/O
  */
-void exc_traceInit();
+void io_init(uint16_t scl);
 
 /**
- * @brief Generate generic panic message
+ * @brief Poll Joypad input
  * 
- * @param message the panic message
+ * @param t the callback function
  */
-void exc_panic(char* message);
+void io_pollJoypad(void(*t)(NESInput, bool));
 
 /**
- * @brief Generate a panic for invalid I/O operations to
- *        the CPU address space
+ * @brief Update controller and display values
  * 
- * @param address the invalid address
+ * @param bitmap the screen bitmap of the PPU
  */
-void exc_panic_invalidIO(uint16_t address);
+void io_update();
 
 /**
- * @brief Generate a panic for invalid I/O operations to
- *        the PPU address space
+ * @brief Print a string directly to the display
  * 
- * @param address the invalid address
+ * @param str 
  */
-void exc_panic_invalidPPUIO(uint16_t address);
+void io_printString(char* str, uint8_t x, uint8_t y);
 
 /**
- * @brief Generate a panic for invalid CPU instructions
+ * @brief Trigger panic
  * 
- * @param address the invalid opcode
+ * @param str the error message
  */
-void exc_panic_illegalInstruction(uint8_t opcode);
+void io_panic(char* str);
 
 /**
- * @brief Generate a CPU trace
- *        Obviously this would be much easier to implement in the CPU class
- *        itself but I've added it here so that the CPU doesn't depend on file I/O
+ * @brief Print a character to display
  * 
- * Too many parameters, most are self-explanatory
+ * @param chr the character
+ * @param x the x coordinate
+ * @param y the y coordinate
  */
-void exc_trace(Trace* trace);
-
-void exc_message(char* message);
-
-void exc_panic_stackOverflow();
-
-void exc_panic_stackUnderflow();
-
-#endif
+void io_printChar(char chr, uint8_t x, uint8_t y);
 
 #endif
