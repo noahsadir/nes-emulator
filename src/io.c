@@ -144,7 +144,7 @@ void io_printString(char* str, uint8_t x, uint8_t y) {
       str += 1;
     }
   }
-  io_update();
+  io_update(NULL);
 }
 
 void io_printChar(char chr, uint8_t x, uint8_t y) {
@@ -170,8 +170,11 @@ void io_printChar(char chr, uint8_t x, uint8_t y) {
   }
 }
 
-void io_update() {
-
+void io_update(char* overlay) {
+  if (overlay != NULL) {
+    io_printString(overlay, 4, 4);
+    return;
+  }
   // update display
   SDL_FreeSurface(surface);
   uint32_t* pixels = (uint32_t*)surface->pixels;

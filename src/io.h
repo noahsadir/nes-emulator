@@ -75,7 +75,7 @@ void io_pollJoypad(void(*t)(NESInput, bool));
  * 
  * @param bitmap the screen bitmap of the PPU
  */
-void io_update();
+void io_update(char* overlay);
 
 /**
  * @brief Print a string directly to the display

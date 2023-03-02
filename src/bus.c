@@ -25,8 +25,6 @@
 #include "bus.h"
 
 uint8_t cpuRAM[2048];
-uint8_t vidRAM[0x2000];
-uint8_t paletteRAM[32];
 uint8_t* prgRAM = NULL;
 
 INES cartridge;
@@ -44,14 +42,21 @@ uint64_t frameIntervalCount = 0;
 uint32_t cpuTimeCount = 0;
 
 #if (PERFORMANCE_DEBUG)
+uint32_t framesElapsed = 0;
+uint32_t framesPerSec = 0;
 double usecsElapsed = 0;
 uint32_t cyclesPerSec = 0;
+uint32_t freqHertz;
+uint32_t framerate;
 struct timeval t1, t2;
+struct timeval pt1, pt2;
+struct timeval pd1, pd2;
 #endif
 
 void bus_init(FileBinary* bin) {
   #if (PERFORMANCE_DEBUG)
   gettimeofday(&t1, NULL);
+  gettimeofday(&pd1, NULL);
   #endif
 
   io_init(DISPLAY_SCALE);
@@ -75,7 +80,7 @@ void bus_init(FileBinary* bin) {
   CPUEmulationMode mode = EMU_MODE; // perhaps this could be set dynamically?
 
   // initialize hardware
-  ppu_init(vidRAM, cartridge.chrRom);
+  ppu_init(cartridge.chrRom, cartridge.header.mirroringType == MIRRORING_VERTICAL, &bus_readCPU, &bus_ppuReport);
   cpu6502_init(&bus_writeCPU, &bus_readCPU, mode);
   //bus_initClock();
 
@@ -299,66 +304,6 @@ uint8_t bus_cartridgeRead(uint16_t addr) {
   return 0;
 }
 
-uint8_t bus_readPPU(uint16_t address) {
-  address = address & 0x3FFF;
-  if (address < 0x2000) { // chr rom
-    return cartridge.chrRom[address];
-  } else if (address < 0x3F00) { // vram
-    return vidRAM[address & 0x1FFF];
-  } else if (address < 0x4000) {
-    address &= 0b0011111;
-    if (address == 0x0010 || address == 0x0014 || address == 0x0018 || address == 0x001C) {
-      address -= 0x0010;
-    }
-    return paletteRAM[address];
-  }
-  return 0x00;
-}
-
-void bus_writePPU(uint16_t address, uint8_t data) {
-  address = address & 0x3FFF;
-  if (address < 0x2000) { // chr rom
-    // read only -- invalid operation
-  } else if (address < 0x3F00) {
-    // I'm sure this incredibly convoluted mirroring makes more sense in
-    // the real hardware implementation. But boy is this a mess in software!
-
-    // NOTE: VRAM addresses 0x2000-0x3FFF, but for simplicity we'll subtract 0x2000
-    //       and flatten 0x3000-0x3FFF onto 0x2000-0x2FFF
-    uint16_t primaryAddr = address & 0x0FFF;
-    uint16_t secondaryAddr = primaryAddr;
-
-    // Per https://www.nesdev.org/wiki/PPU_nametables,
-    // Vertical mirroring: $2000 equals $2800 and $2400 equals $2C00 (e.g. Super Mario Bros.)
-    // Horizontal mirroring: $2000 equals $2400 and $2800 equals $2C00 (e.g. Kid Icarus)
-    if (cartridge.header.mirroringType == MIRRORING_VERTICAL) {
-      if ((primaryAddr / 0x400) & 3) { // (if quadrant >= 2)
-        secondaryAddr = primaryAddr - 0x0800;
-      } else {
-        secondaryAddr = primaryAddr + 0x0800;
-      }
-    } else {
-      if ((primaryAddr / 0x400) & 1) { // (if quadrant is odd)
-        secondaryAddr = primaryAddr - 0x0400;
-      } else {
-        secondaryAddr = primaryAddr + 0x0400;
-      }
-    }
-    // Data is mirrored to 4 addresses on VRAM
-    vidRAM[primaryAddr] = data;
-    vidRAM[secondaryAddr] = data;
-    // 0x2000-0x2FFF mirrors 0x3000-0x3FFF
-    vidRAM[primaryAddr + 0x1000] = data;
-    vidRAM[secondaryAddr + 0x1000] = data;
-  } else if (address < 0x4000) {
-    address &= 0b00011111;
-    if (address == 0x0010 || address == 0x0014 || address == 0x0018 || address == 0x001C) {
-      address -= 0x0010;
-    }
-    paletteRAM[address] = data;
-  }
-}
-
 void bus_setJoypad(JoypadButton button) {
     joypad_setButton(button);
 }
@@ -395,11 +340,12 @@ void bus_initClock() {
 
 void bus_initPPU() {
     #if (!HEADLESS)
-    ppu_init(vidRAM, cartridge.chrRom);
+    ppu_init(cartridge.chrRom, cartridge.header.mirroringType == MIRRORING_VERTICAL, &bus_readCPU, &bus_ppuReport);
     #endif
 }
 
 void bus_cpuReport(uint8_t cycleCount) {
+  cyclesPerSec += cycleCount;
   // update PPU
   #if (!HEADLESS)
   // run 3x the number of cycles on the PPU
@@ -447,10 +393,45 @@ void bus_frameIntervalReport() {
 }
 
 void bus_ppuReport() {
-    #if (!HEADLESS)
-    io_update();
-    #endif
-    io_pollJoypad(&bus_handleInput);
+  char str[32];
+  str[0] = '\0';
+  #if (PERFORMANCE_DEBUG)
+  gettimeofday(&pd2, NULL); // poll delay
+  uint32_t delayCounter = (pd2.tv_sec - pd1.tv_sec) * 1000000.0;
+  delayCounter += (pd2.tv_usec - pd1.tv_usec);
+  framesElapsed += 1;
+  if (delayCounter >= 1000000) {
+    freqHertz = cyclesPerSec;
+    framerate = framesElapsed;
+    framesElapsed = 0;
+    cyclesPerSec = 0;
+    gettimeofday(&pd1, NULL);
+  }
+  uint32_t fq = freqHertz;
+  uint32_t fr = framerate;
+  for (int i = 8; i >= 0; i--) {
+    if (i < 3) {
+      str[i] = '0' + (fq % 10);
+    } else if (i < 6) {
+      str[i + 1] = '0' + (fq % 10);
+      str[i] = '.';
+    }
+    fq /= 10;
+  }
+  str[7] = '\0';
+  strcat(str, " MHz (");
+  for (int i = 16; i >= 13; i--) {
+    str[i] = '0' + (fr % 10);
+    fr /= 10;
+  }
+  str[17] = '\0';
+  strcat(str, " FPS)");
+  #endif
+
+  #if (!HEADLESS)
+  io_update(str);
+  #endif
+  io_pollJoypad(&bus_handleInput);
 }
 
 void bus_handleInput(NESInput input, bool enabled) {

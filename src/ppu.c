@@ -41,9 +41,11 @@ uint8_t dataBuffer = 0x00;
 bool addressLatch = false;
 bool scrollLatch = false;
 bool triggerSpriteZero = false;
+bool verticalMirroring = false;
 
 uint8_t oamRAM[0x00FF];
-uint8_t* vidRAM;
+uint8_t vidRAM[0x2000];
+uint8_t paletteRAM[32];
 uint8_t* chrROM;
 uint32_t bitmap[61440];
 
@@ -51,9 +53,14 @@ uint64_t ppuCycles = 0;
 uint64_t ppuFrames = 0;
 uint16_t scanline = 0;
 
-void ppu_init(uint8_t* vram, uint8_t* crom) {
-    vidRAM = vram;
+void(*callback)(uint32_t*);
+uint8_t(*readCPUDirect)(uint16_t);
+
+void ppu_init(uint8_t* crom, bool vmirror, uint8_t(*r)(uint16_t), void(*c)(uint32_t*)) {
+    callback = c;
     chrROM = crom;
+    readCPUDirect = r;
+    verticalMirroring = vmirror;
     for (int i = 0; i < 61440; i++) {
         bitmap[i] = 0;
     }
@@ -81,7 +88,7 @@ void ppu_scanline() {
     if (scanline == 240) {
         //ppu_drawCHRROM(0);
         //ppu_drawRAMPalette();
-        bus_ppuReport(bitmap);
+        callback(bitmap);
         ppuFrames += 1;
     }
 
@@ -110,8 +117,8 @@ void ppu_setPixel(uint32_t color, int16_t x, int16_t y) {
 void ppu_drawTile(bool bank, uint16_t tileID, uint8_t palette, uint16_t x, uint16_t y) {
     tileID *= 16;
     for (uint16_t row = 0; row < 8; row++) {
-        uint8_t high = bus_readPPU((0x1000 * bank) + tileID + row + 8);
-        uint8_t low = bus_readPPU((0x1000 * bank) + tileID + row);
+        uint8_t high = ppu_readMem((0x1000 * bank) + tileID + row + 8);
+        uint8_t low = ppu_readMem((0x1000 * bank) + tileID + row);
         for (uint16_t col = 0; col < 8; col++) {
             uint8_t color = ((high & 1) << 1) | (low & 1);
             high >>= 1;
@@ -158,10 +165,10 @@ void ppu_drawScanline(uint8_t y) {
             nametablePos += (((tileCol + coarseX) / 32) * 0x0400);
             
             // cycle 2-3
-            uint8_t nametableByte = bus_readPPU(nametablePos + adjCol + (adjRow * 32));
+            uint8_t nametableByte = ppu_readMem(nametablePos + adjCol + (adjRow * 32));
 
             // cycle 3-4
-            uint8_t attributeByte = bus_readPPU(nametablePos + 0x03C0 + (adjCol / 4) + ((adjRow / 4) * 8));
+            uint8_t attributeByte = ppu_readMem(nametablePos + 0x03C0 + (adjCol / 4) + ((adjRow / 4) * 8));
             if ((adjCol / 2) % 2 == 1) {
                 attributeByte >>= 2;
             }
@@ -171,10 +178,10 @@ void ppu_drawScanline(uint8_t y) {
             attributeByte &= 0b00000011;
 
             // cycle 5-6
-            uint8_t chrLow = bus_readPPU(bankOffset + (nametableByte * 16) + (y % 8));
+            uint8_t chrLow = ppu_readMem(bankOffset + (nametableByte * 16) + (y % 8));
 
             // cycle 6-7
-            uint8_t chrHigh = bus_readPPU(bankOffset + (nametableByte * 16) + (y % 8) + 8);
+            uint8_t chrHigh = ppu_readMem(bankOffset + (nametableByte * 16) + (y % 8) + 8);
 
             for (int pixCol = 7; pixCol >= 0; pixCol--) {
                 uint8_t colorID = ((chrHigh & 1) << 1) | (chrLow & 1);
@@ -187,7 +194,7 @@ void ppu_drawScanline(uint8_t y) {
                 
 
                 if (colorID == 0) {
-                    ppu_setPixel(ppu_colors[bus_readPPU(0x3F00)], (tileCol * 8) + pixCol - fineX, y - fineY);
+                    ppu_setPixel(ppu_colors[ppu_readMem(0x3F00)], (tileCol * 8) + pixCol - fineX, y - fineY);
                 } else {
                     ppu_setPixel(ppu_getColor(attributeByte, colorID), (tileCol * 8) + pixCol - fineX, y - fineY);
                 }
@@ -205,8 +212,8 @@ void ppu_drawScanline(uint8_t y) {
                 bool flipVertically = (oamRAM[i + 2] >> 7) & 1;
                 bool isBehindBackground = (oamRAM[i + 2] >> 5) & 1;
                 if (flipVertically) relY = 7 - relY;
-                uint8_t sprLow = bus_readPPU(spriteBankOffset + (oamRAM[i + 1] * 16) + relY);
-                uint8_t sprHigh = bus_readPPU(spriteBankOffset + (oamRAM[i + 1] * 16) + relY + 8);
+                uint8_t sprLow = ppu_readMem(spriteBankOffset + (oamRAM[i + 1] * 16) + relY);
+                uint8_t sprHigh = ppu_readMem(spriteBankOffset + (oamRAM[i + 1] * 16) + relY + 8);
                 
                 uint8_t paletteID = (oamRAM[i + 2]) & 0b00000011;
                 for (int pixCol = 7; pixCol >= 0; pixCol--) {
@@ -248,7 +255,7 @@ void ppu_drawRAMPalette() {
         uint16_t x = ((i % 16) + ((i % 16) / 4)) + 1;
         uint16_t y = (i / 16) * 2;
         uint16_t location = (y * 256 * 8) + (x * 8);
-        uint32_t color = ppu_colors[bus_readPPU(0x3F00 + i)];
+        uint32_t color = ppu_colors[ppu_readMem(0x3F00 + i)];
         for (int j = 0; j < 64; j++) {
             location += 1;
             if (j % 8 == 0) {
@@ -260,7 +267,7 @@ void ppu_drawRAMPalette() {
 }
 
 uint32_t ppu_getColor(uint8_t palette, uint8_t colorID) {
-    return ppu_colors[bus_readPPU(0x3F00 + (palette << 2) + colorID)];
+    return ppu_colors[ppu_readMem(0x3F00 + (palette << 2) + colorID)];
 }
 
 uint32_t* ppu_getDisplayBitmap() {
@@ -323,9 +330,9 @@ uint8_t ppu_getRegister(enum PPURegister reg) {
     } else if (reg == PPU_PPUDATA) {
         if (addressBuffer < 0x3F00) {
             reg_ppudata = dataBuffer;
-            dataBuffer = bus_readPPU(addressBuffer);
+            dataBuffer = ppu_readMem(addressBuffer);
         } else {
-            reg_ppudata = bus_readPPU(addressBuffer);
+            reg_ppudata = ppu_readMem(addressBuffer);
         }
         addressBuffer += ppu_getControlFlag(PPUCTRL_INCREMENT) ? 32 : 1;
         return reg_ppudata;
@@ -363,7 +370,7 @@ void ppu_setRegister(enum PPURegister reg, uint8_t data) {
         reg_scroll = data;
     } else if (reg == PPU_PPUDATA) {
         reg_ppudata = data;
-        bus_writePPU(addressBuffer, reg_ppudata);
+        ppu_writeMem(addressBuffer, reg_ppudata);
         addressBuffer += ppu_getControlFlag(PPUCTRL_INCREMENT) ? 32 : 1;
     } else if (reg == PPU_PPUADDR) {
         if (addressLatch) {
@@ -377,8 +384,68 @@ void ppu_setRegister(enum PPURegister reg, uint8_t data) {
     } else if (reg == PPU_OAMDMA) {
         uint16_t startAddr = ((uint16_t) data) << 8;
         for (int i = 0; i < 256; i++) {
-            oamRAM[i] = bus_readCPU(startAddr + i);
+            oamRAM[i] = readCPUDirect(startAddr + i);
         }
         reg_oamdma = data;
     }
+}
+
+uint8_t ppu_readMem(uint16_t address) {
+  address = address & 0x3FFF;
+  if (address < 0x2000) { // chr rom
+    return chrROM[address];
+  } else if (address < 0x3F00) { // vram
+    return vidRAM[address & 0x1FFF];
+  } else if (address < 0x4000) {
+    address &= 0b0011111;
+    if (address == 0x0010 || address == 0x0014 || address == 0x0018 || address == 0x001C) {
+      address -= 0x0010;
+    }
+    return paletteRAM[address];
+  }
+  return 0x00;
+}
+
+void ppu_writeMem(uint16_t address, uint8_t data) {
+  address = address & 0x3FFF;
+  if (address < 0x2000) { // chr rom
+    // read only -- invalid operation
+  } else if (address < 0x3F00) {
+    // I'm sure this incredibly convoluted mirroring makes more sense in
+    // the real hardware implementation. But boy is this a mess in software!
+
+    // NOTE: VRAM addresses 0x2000-0x3FFF, but for simplicity we'll subtract 0x2000
+    //       and flatten 0x3000-0x3FFF onto 0x2000-0x2FFF
+    uint16_t primaryAddr = address & 0x0FFF;
+    uint16_t secondaryAddr = primaryAddr;
+
+    // Per https://www.nesdev.org/wiki/PPU_nametables,
+    // Vertical mirroring: $2000 equals $2800 and $2400 equals $2C00 (e.g. Super Mario Bros.)
+    // Horizontal mirroring: $2000 equals $2400 and $2800 equals $2C00 (e.g. Kid Icarus)
+    if (verticalMirroring) {
+      if ((primaryAddr / 0x400) & 3) { // (if quadrant >= 2)
+        secondaryAddr = primaryAddr - 0x0800;
+      } else {
+        secondaryAddr = primaryAddr + 0x0800;
+      }
+    } else {
+      if ((primaryAddr / 0x400) & 1) { // (if quadrant is odd)
+        secondaryAddr = primaryAddr - 0x0400;
+      } else {
+        secondaryAddr = primaryAddr + 0x0400;
+      }
+    }
+    // Data is mirrored to 4 addresses on VRAM
+    vidRAM[primaryAddr] = data;
+    vidRAM[secondaryAddr] = data;
+    // 0x2000-0x2FFF mirrors 0x3000-0x3FFF
+    vidRAM[primaryAddr + 0x1000] = data;
+    vidRAM[secondaryAddr + 0x1000] = data;
+  } else if (address < 0x4000) {
+    address &= 0b00011111;
+    if (address == 0x0010 || address == 0x0014 || address == 0x0018 || address == 0x001C) {
+      address -= 0x0010;
+    }
+    paletteRAM[address] = data;
+  }
 }
