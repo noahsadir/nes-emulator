@@ -105,7 +105,7 @@ void cpu6502_nmi() {
   reg.pc = ((uint16_t)memRead(0xFFFB) << 8) | (uint16_t)memRead(0xFFFA);
 }
 
-static inline void cpu6502_stackPush(uint8_t val) {
+static force_inline void cpu6502_stackPush(uint8_t val) {
   if (reg.s == 0x00) {
     // overflow
   } else {
@@ -114,7 +114,7 @@ static inline void cpu6502_stackPush(uint8_t val) {
   }
 }
 
-static inline uint8_t cpu6502_stackPull() {
+static force_inline uint8_t cpu6502_stackPull() {
   if (reg.s == 0xFF) {
     // underflow
   } else {
@@ -125,11 +125,11 @@ static inline uint8_t cpu6502_stackPull() {
   return 0;
 }
 
-static inline bool cpu6502_shouldBranch(bool desiredResult, CPUStatusFlag flag) {
+static force_inline bool cpu6502_shouldBranch(bool desiredResult, CPUStatusFlag flag) {
   return (((reg.p & flag) > 0) == desiredResult);
 }
 
-static inline void cpu6502_setFlag(CPUStatusFlag flag, bool enabled) {
+static force_inline void cpu6502_setFlag(CPUStatusFlag flag, bool enabled) {
   if (enabled) {
     reg.p |= flag;
   } else {
@@ -145,7 +145,7 @@ void cpu6502_setClockMode(CPUClockMode mode) {
   clockMode = mode;
 }
 
-uint16_t cpu6502_read16(uint16_t addr) {
+static force_inline uint16_t cpu6502_read16(uint16_t addr) {
   return (((uint16_t)memRead(addr + 1) << 8) | (uint16_t)memRead(addr));
 }
 
@@ -164,7 +164,7 @@ void cpu6502_dasm(uint8_t* prgData, uint32_t prgSize, void(*c)(char c[128]), uin
   }
 }
 
-void cpu6502_parseOpcode(uint8_t opcode, Bytecode* b) {
+static force_inline void cpu6502_parseOpcode(uint8_t opcode, Bytecode* b) {
   if (b == NULL) return;
   b->mnemonic = I_UNSET;
   b->addressingMode = AM_UNSET;
@@ -688,7 +688,7 @@ void cpu6502_parseOpcode(uint8_t opcode, Bytecode* b) {
   }
 }
 
-static inline uint8_t cpu6502_execute(Bytecode* b) {
+static force_inline uint8_t cpu6502_execute(Bytecode* b) {
   uint16_t val;
   switch (b->addressingMode) {
     case AM_IMMEDIATE:

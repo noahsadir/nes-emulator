@@ -179,7 +179,7 @@ void io_update(char* overlay) {
   uint32_t delayCounter = (t2.tv_sec - t1.tv_sec) * 1000000.0;
   delayCounter += (t2.tv_usec - t1.tv_usec);
 
-  if (delayCounter >= MIN_DRAW_INTERVAL) {
+  if (delayCounter >= MIN_DRAW_INTERVAL || didPanic) {
     delayCounter = 0;
     if (overlay != NULL) {
       io_printString(overlay, 4, 4);

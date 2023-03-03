@@ -65,14 +65,14 @@ void cpu6502_nmi();
  * 
  * @param val the value to push
  */
-static inline void cpu6502_stackPush(uint8_t val);
+static force_inline void cpu6502_stackPush(uint8_t val);
 
 /**
  * @brief Pull a value from the stack
  * 
  * @return uint8_t the value pulled
  */
-static inline uint8_t cpu6502_stackPull();
+static force_inline uint8_t cpu6502_stackPull();
 
 /**
  * @brief Set a CPU flag
@@ -80,7 +80,7 @@ static inline uint8_t cpu6502_stackPull();
  * @param flag the CPU flag
  * @param enabled the value of the flag
  */
-static inline void cpu6502_setFlag(CPUStatusFlag flag, bool enabled);
+static force_inline void cpu6502_setFlag(CPUStatusFlag flag, bool enabled);
 
 /**
  * @brief Perform a branch
@@ -88,7 +88,7 @@ static inline void cpu6502_setFlag(CPUStatusFlag flag, bool enabled);
  * @param desiredResult the branch condition
  * @param flag the flag to check condition for
  */
-static inline bool cpu6502_shouldBranch(bool desiredResult, CPUStatusFlag flag);
+static force_inline bool cpu6502_shouldBranch(bool desiredResult, CPUStatusFlag flag);
 
 /**
  * @brief Execute a bytecode instruction
@@ -96,7 +96,7 @@ static inline bool cpu6502_shouldBranch(bool desiredResult, CPUStatusFlag flag);
  * @param b the bytecode pointer
  * @return uint8_t the number of clocks elapsed
  */
-static inline uint8_t cpu6502_execute(Bytecode* b);
+static force_inline uint8_t cpu6502_execute(Bytecode* b);
 
 /**
  * @brief Set the clock mode of the CPU
@@ -118,7 +118,7 @@ CPUClockMode cpu6502_getClockMode();
  * @param addr the address
  * @return uint16_t the return value
  */
-uint16_t cpu6502_read16(uint16_t addr);
+static force_inline uint16_t cpu6502_read16(uint16_t addr);
 
 /**
  * @brief Disassembly program code
@@ -136,7 +136,7 @@ void cpu6502_dasm(uint8_t* prgData, uint32_t prgSize, void(*c)(char c[128]), uin
  * @param opcode the opcode
  * @param b the pointer to the bytecode object
  */
-void cpu6502_parseOpcode(uint8_t opcode, Bytecode* b);
+static force_inline void cpu6502_parseOpcode(uint8_t opcode, Bytecode* b);
 
 /**
  * @brief Get error number of CPU

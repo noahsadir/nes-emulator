@@ -41,6 +41,7 @@ int32_t cyclesUntilSample = 0;
 int32_t cyclesUntilSecond = 0;
 uint64_t frameIntervalCount = 0;
 uint32_t cpuTimeCount = 0;
+uint32_t ppuCycleDebt = 0;
 
 #if (PERFORMANCE_DEBUG)
 uint32_t framesElapsed = 0;
@@ -100,7 +101,7 @@ void bus_init(FileBinary* bin) {
   {
     case 0: io_panic("(CPU) 0x00 UNEXPECTED_HALT"); break;
     case 1: io_panic("(CPU) 0x01 ILLEGAL_INSTR"); break;
-    default: io_panic("(CPU) 0x?? UNKNOWN"); break;
+    default: io_panic("(CPU) 0xFF UNKNOWN"); break;
   }
   cpu6502_setClockMode(CPUCLOCK_HALT);
   while (true) io_pollJoypad(&bus_handleInput); // wait for user to exit, essentially
@@ -336,7 +337,7 @@ void bus_initClock() {
     }
   }
 
-  io_panic("(BUS) 0x00 CPU_HALT");
+  io_panic("(CPU) 0x00 UNEXPECTED_HALT");
   while (true) io_pollJoypad(&bus_handleInput);
 }
 
@@ -350,6 +351,8 @@ void bus_cpuReport(uint8_t cycleCount) {
   cyclesPerSec += cycleCount;
   // update PPU
   #if (!HEADLESS)
+  ppuCycleDebt += cycleCount;
+  // let PPU catch up either immediately or once per frame
   // run 3x the number of cycles on the PPU
   ppu_runCycles(cycleCount * 3);
 
@@ -359,6 +362,7 @@ void bus_cpuReport(uint8_t cycleCount) {
     bus_triggerNMI();
     ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
   }
+  
   #endif
 
   // update cycle counters
@@ -369,7 +373,7 @@ void bus_cpuReport(uint8_t cycleCount) {
   // pause CPU until next frame interval
   if (cyclesUntilDelay <= 0) {
       if (syncMode != SYNC_DISABLED) cpuPaused = true;
-      cyclesUntilDelay += CPU_FRAME_CLOCKS;
+      cyclesUntilDelay += CPU_FRAME_CYCLES;
   }
 
   // CPU second has elapsed (CPU second = 1789773 clocks)
@@ -432,7 +436,7 @@ void bus_ppuReport() {
   #if (!HEADLESS)
   io_update(debugOverlayString);
   #endif
-  
+
   io_pollJoypad(&bus_handleInput);
 }
 
@@ -451,7 +455,7 @@ void bus_triggerNMI() {
 }
 
 void bus_triggerCPUPanic() {
-    io_panic("(BUS) 0x01 TRIGGER_PANIC");
+    io_panic("(SYS) 0x00 TRIGGER_PANIC");
     while (true) io_pollJoypad(&bus_handleInput);
 }
 

@@ -24,15 +24,7 @@
 
 #include "ppu.h"
 
-uint8_t reg_control     = 0b00000000;
-uint8_t reg_mask        = 0b00000000;
-uint8_t reg_ppuStatus   = 0b00000000;
-uint8_t reg_oamaddr     = 0x00;
-uint8_t reg_oamdata     = 0x00;
-uint8_t reg_scroll      = 0x00;
-uint8_t reg_ppuaddr     = 0x00;
-uint8_t reg_ppudata     = 0x00;
-uint8_t reg_oamdma      = 0x00;
+Register ppureg;
 
 uint16_t addressBuffer = 0x0000;
 uint8_t scrollX = 0;
@@ -42,12 +34,14 @@ bool addressLatch = false;
 bool scrollLatch = false;
 bool triggerSpriteZero = false;
 bool verticalMirroring = false;
+bool didRenderFrame = false;
 
 uint8_t oamRAM[0x00FF];
 uint8_t vidRAM[0x2000];
 uint8_t paletteRAM[32];
 uint8_t* chrROM;
 uint32_t bitmap[61440];
+uint8_t chrCache[512][64];
 
 uint64_t ppuCycles = 0;
 uint64_t ppuFrames = 0;
@@ -57,79 +51,129 @@ void(*callback)(uint32_t*);
 uint8_t(*readCPUDirect)(uint16_t);
 
 void ppu_init(uint8_t* crom, bool vmirror, uint8_t(*r)(uint16_t), void(*c)(uint32_t*)) {
-    callback = c;
-    chrROM = crom;
-    readCPUDirect = r;
-    verticalMirroring = vmirror;
-    for (int i = 0; i < 61440; i++) {
-        bitmap[i] = 0;
-    }
+  callback = c;
+  chrROM = crom;
+  readCPUDirect = r;
+  verticalMirroring = vmirror;
+  ppureg.control     = 0x00;
+  ppureg.mask        = 0x00;
+  ppureg.ppuStatus   = 0x00;
+  ppureg.oamaddr     = 0x00;
+  ppureg.oamdata     = 0x00;
+  ppureg.scroll      = 0x00;
+  ppureg.ppuaddr     = 0x00;
+  ppureg.ppudata     = 0x00;
+  ppureg.oamdma      = 0x00;
+  ppu_generateChrCache();
+  for (int i = 0; i < 61440; i++) {
+    bitmap[i] = 0;
+  }
 }
 
-void ppu_runCycles(uint8_t cycleCount) {
-    ppuCycles += cycleCount;
-    if (ppuCycles >= 341) {
-        ppu_scanline();
-        ppuCycles -= 341;
-    }
+void ppu_runCycles(uint32_t cycleCount) {
+  #if (PPU_IMMEDIATE_CATCHUP)
+  ppuCycles += cycleCount;
+  if (ppuCycles >= 341) {
+    ppu_scanline();
+    ppuCycles -= 341;
+  }
+  #else
+  ppuCycles += cycleCount;
+  if (ppuCycles >= PPU_FRAME_CYCLES) {
+    // end of frame; reset vblank and sprite zero hit
+    ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
+    ppu_setStatusFlag(PPUSTAT_SPRITEZRO, false);
+    ppuCycles -= PPU_FRAME_CYCLES;
+    didRenderFrame = false;
+  } else if (!didRenderFrame && ppuCycles >= PPU_SCANLINE_CYCLES * DISPLAY_HEIGHT) {
+    // render all scanlines all at once and start vblank
+    ppu_drawFrame();
+    callback(bitmap);
+    didRenderFrame = true;
+    ppu_setStatusFlag(PPUSTAT_VBLKSTART, true);
+  }
+  #endif
 }
 
 uint64_t ppu_getFrames() {
-    return ppuFrames;
+  return ppuFrames;
 }
 
-void ppu_scanline() {
-    // render scanlines
-    if (scanline >= 0 && scanline <= 239) {
-        ppu_drawScanline(scanline);
-    }
+static force_inline void ppu_scanline() {
+  // render scanlines
+  if (scanline >= 0 && scanline <= 239) {
+    ppu_drawScanline(scanline);
+  }
 
-    // render all at once rather than by scanline
-    if (scanline == 240) {
-        //ppu_drawCHRROM(0);
-        //ppu_drawRAMPalette();
-        callback(bitmap);
-        ppuFrames += 1;
-    }
+  // render all at once rather than by scanline
+  if (scanline == 240) {
+    callback(bitmap);
+    ppuFrames += 1;
+  }
 
-    // start vblank
-    if (scanline == 241) {
-        ppu_setStatusFlag(PPUSTAT_VBLKSTART, true);
-    }
+  // start vblank
+  if (scanline == 241) {
+    ppu_setStatusFlag(PPUSTAT_VBLKSTART, true);
+  }
 
-    // end vblank
-    if (scanline == 261) {
-        ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
-        ppu_setStatusFlag(PPUSTAT_SPRITEZRO, false);
-        scanline = 0;
-    } else {
-        scanline += 1;
-    }
+  // end vblank
+  if (scanline == 261) {
+    ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
+    ppu_setStatusFlag(PPUSTAT_SPRITEZRO, false);
+    scanline = 0;
+  } else {
+    scanline += 1;
+  }
 }
 
-static inline void ppu_setPixel(uint32_t color, int16_t x, int16_t y) {
-    if (x >= 0 && x < 256 && y >= 0 && y < 240) {
-        uint16_t location = (y * 256) + x;
-        bitmap[location] = color;
-    }
+static force_inline void ppu_setPixel(uint32_t color, int16_t x, int16_t y) {
+  if (x >= 0 && x < 256 && y >= 0 && y < 240) bitmap[(y * 256) + x] = color;
 }
 
 void ppu_drawTile(bool bank, uint16_t tileID, uint8_t palette, uint16_t x, uint16_t y) {
-    tileID *= 16;
-    for (uint16_t row = 0; row < 8; row++) {
-        uint8_t high = ppu_readMem((0x1000 * bank) + tileID + row + 8);
-        uint8_t low = ppu_readMem((0x1000 * bank) + tileID + row);
-        for (uint16_t col = 0; col < 8; col++) {
-            uint8_t color = ((high & 1) << 1) | (low & 1);
-            high >>= 1;
-            low >>= 1;
-            ppu_setPixel(ppu_getColor(0, color), x + (8 - col) + (bank * 128), y + row);
-            
-        }
+  for (uint16_t row = 0; row < 8; row++) {
+    for (uint16_t col = 0; col < 8; col++) {
+      ppu_setPixel(ppu_colors[paletteRAM[chrCache[tileID][(row * 8) + col]]], x + (8 - col) + (bank * 128), y + row);
     }
+  }
 }
 
-void ppu_drawScanline(uint8_t y) {
+void ppu_drawCHRROM(uint16_t bank) {
+  for (uint16_t y = 0; y < 16; y++) {
+    for (uint16_t x = 0; x < 16; x++) {
+      ppu_drawTile(bank, (y * 16) + x, 0, x * 8, y * 8);
+    }
+  }
+  if (bank == 0) {
+    ppu_drawCHRROM(1);
+  }
+}
+
+void ppu_generateChrCache() {
+  // Storage of character data is very memory efficient, but also
+  // computationally expensive to decode.
+  // Since memory is cheap and abundant now, we can store it in a manner
+  // that's easier to read from on-the-fly
+  for (uint16_t tileID = 0; tileID < 512; tileID++) {
+    for (uint16_t row = 0; row < 8; row++) {
+      uint8_t high = chrROM[((tileID * 16) + row + 8) & 0x3FFF];
+      uint8_t low = chrROM[((tileID * 16) + row) & 0x3FFF];
+      for (uint16_t col = 0; col < 8; col++) {
+        uint8_t color = ((high & 1) << 1) | (low & 1);
+        high >>= 1;
+        low >>= 1;
+        chrCache[tileID][(row * 8) + col] = color;
+      }
+    }
+  }
+}
+
+
+static force_inline void ppu_drawFrame() {
+  ppu_drawCHRROM(0);
+}
+
+static force_inline void ppu_drawScanline(uint8_t y) {
     uint8_t fineX = scrollX % 8;
     uint8_t fineY = scrollY % 8;
     uint8_t coarseX = scrollX / 8;
@@ -140,7 +184,7 @@ void ppu_drawScanline(uint8_t y) {
     bool containsSpriteZero = false;
 
     uint16_t nametableOffset = (((((uint16_t) ppu_getControlFlag(PPUCTRL_NAMETABLE2)) << 1) | ((uint16_t) ppu_getControlFlag(PPUCTRL_NAMETABLE1))) * 0x0400);
-    uint16_t bankOffset = 0x1000 * ppu_getControlFlag(PPUCTRL_BKGPATT);
+    uint16_t bankOffset = 256 * ppu_getControlFlag(PPUCTRL_BKGPATT);
     uint16_t spriteBankOffset = 0x1000 * ppu_getControlFlag(PPUCTRL_SPRITEPATT);
 
     // ensures 1-scanline delay for sprite zero hit
@@ -160,14 +204,14 @@ void ppu_drawScanline(uint8_t y) {
             uint8_t adjCol = ((tileCol + coarseX) % 32);
             uint8_t adjRow = ((tileRow + coarseY) % 32);
 
-            uint16_t nametablePos = 0x2000 + nametableOffset;
+            uint16_t nametablePos = nametableOffset;
             nametablePos += (((tileCol + coarseX) / 32) * 0x0400);
             
             // cycle 2-3
-            uint8_t nametableByte = ppu_readMem(nametablePos + adjCol + (adjRow * 32));
+            uint8_t nametableByte = vidRAM[nametablePos + adjCol + (adjRow * 32)];
 
             // cycle 3-4
-            uint8_t attributeByte = ppu_readMem(nametablePos + 0x03C0 + (adjCol / 4) + ((adjRow / 4) * 8));
+            uint8_t attributeByte = vidRAM[nametablePos + 0x03C0 + (adjCol / 4) + ((adjRow / 4) * 8)];
             if ((adjCol / 2) % 2 == 1) {
                 attributeByte >>= 2;
             }
@@ -176,27 +220,14 @@ void ppu_drawScanline(uint8_t y) {
             }
             attributeByte &= 0b00000011;
 
-            // cycle 5-6
-            uint8_t chrLow = ppu_readMem(bankOffset + (nametableByte * 16) + (y % 8));
-
-            // cycle 6-7
-            uint8_t chrHigh = ppu_readMem(bankOffset + (nametableByte * 16) + (y % 8) + 8);
-
-            for (int pixCol = 7; pixCol >= 0; pixCol--) {
-                uint8_t colorID = ((chrHigh & 1) << 1) | (chrLow & 1);
-                chrLow >>= 1;
-                chrHigh >>= 1;
-
-                if (tileCol < 32) {
-                    backgroundPixels[(tileCol * 8) + pixCol] = colorID;
-                }
-                
-
-                if (colorID == 0) {
-                    ppu_setPixel(ppu_colors[ppu_readMem(0x3F00)], (tileCol * 8) + pixCol - fineX, y - fineY);
-                } else {
-                    ppu_setPixel(ppu_getColor(attributeByte, colorID), (tileCol * 8) + pixCol - fineX, y - fineY);
-                }
+            uint8_t* tile = chrCache[bankOffset + nametableByte];
+            for (int pixCol = 0; pixCol < 8; pixCol++) {
+              uint8_t colorID = tile[((y % 8) * 8) + (7 - pixCol)];
+              if (colorID == 0) {
+                ppu_setPixel(ppu_colors[paletteRAM[0]], (tileCol * 8) + pixCol - fineX, y - fineY);
+              } else {
+                ppu_setPixel(ppu_colors[paletteRAM[(attributeByte << 2) + colorID]], (tileCol * 8) + pixCol - fineX, y - fineY);
+              }
             }
         }
     }
@@ -211,8 +242,8 @@ void ppu_drawScanline(uint8_t y) {
                 bool flipVertically = (oamRAM[i + 2] >> 7) & 1;
                 bool isBehindBackground = (oamRAM[i + 2] >> 5) & 1;
                 if (flipVertically) relY = 7 - relY;
-                uint8_t sprLow = ppu_readMem(spriteBankOffset + (oamRAM[i + 1] * 16) + relY);
-                uint8_t sprHigh = ppu_readMem(spriteBankOffset + (oamRAM[i + 1] * 16) + relY + 8);
+                uint8_t sprLow = chrROM[(spriteBankOffset + (oamRAM[i + 1] * 16) + relY) & 0x3FFF];
+                uint8_t sprHigh = chrROM[(spriteBankOffset + (oamRAM[i + 1] * 16) + relY + 8) & 0x3FFF];
                 
                 uint8_t paletteID = (oamRAM[i + 2]) & 0b00000011;
                 for (int pixCol = 7; pixCol >= 0; pixCol--) {
@@ -224,7 +255,7 @@ void ppu_drawScanline(uint8_t y) {
                         uint8_t relX = oamRAM[i + 3] + ((flipHorizontally) ? 7 - pixCol : pixCol);
                         
                         if (backgroundPixels[relX] == 0 || !isBehindBackground) {
-                            ppu_setPixel(ppu_getColor(paletteID + 4, colorID), relX, y);
+                            ppu_setPixel(ppu_colors[paletteRAM[((paletteID + 4) << 2) + colorID]], relX, y);
                         }
 
                         if (containsSpriteZero && i == 0) {
@@ -236,17 +267,6 @@ void ppu_drawScanline(uint8_t y) {
         } // bracket 2 of 6
     } // bracket 1 of 6
 
-}
-
-void ppu_drawCHRROM(uint16_t bank) {
-    for (uint16_t y = 0; y < 16; y++) {
-        for (uint16_t x = 0; x < 16; x++) {
-            ppu_drawTile(bank, (y * 16) + x, 0, x * 8, y * 8);
-        }
-    }
-    if (bank == 0) {
-        ppu_drawCHRROM(1);
-    }
 }
 
 void ppu_drawRAMPalette() {
@@ -265,9 +285,12 @@ void ppu_drawRAMPalette() {
     }
 }
 
+/*
+// Obsolete - will remain for reference on how to calculate color
 static inline uint32_t ppu_getColor(uint8_t palette, uint8_t colorID) {
-    return ppu_colors[ppu_readMem(0x3F00 + (palette << 2) + colorID)];
+    return ppu_colors[paletteRAM[(palette << 2) + colorID]];
 }
+*/
 
 uint32_t* ppu_getDisplayBitmap() {
     return bitmap;
@@ -275,118 +298,130 @@ uint32_t* ppu_getDisplayBitmap() {
 
 void ppu_setStatusFlag(enum PPUStatusFlag flag, bool enable) {
     if (enable) {
-        reg_ppuStatus |= flag;
+        ppureg.ppuStatus |= flag;
     } else {
-        reg_ppuStatus &= ~flag;
+        ppureg.ppuStatus &= ~flag;
     }
 }
 
 bool ppu_getStatusFlag(enum PPUStatusFlag flag) {
-    return (reg_ppuStatus & flag) > 0;
+    return (ppureg.ppuStatus & flag) > 0;
 }
 
 void ppu_setMaskFlag(enum PPUMaskFlag flag, bool enable) {
     if (enable) {
-        reg_mask |= flag;
+        ppureg.mask |= flag;
     } else {
-        reg_mask &= ~flag;
+        ppureg.mask &= ~flag;
     }
 }
 
 bool ppu_getMaskFlag(enum PPUMaskFlag flag) {
-    return (reg_mask & flag) > 0;
+    return (ppureg.mask & flag) > 0;
 }
 
 void ppu_setControlFlag(enum PPUControlFlag flag, bool enable) {
     if (enable) {
-        reg_control |= flag;
+        ppureg.control |= flag;
     } else {
-        reg_control &= ~flag;
+        ppureg.control &= ~flag;
     }
 }
 
 bool ppu_getControlFlag(enum PPUControlFlag flag) {
-    return (reg_control & flag) > 0;
+    return (ppureg.control & flag) > 0;
 }
 
-uint8_t ppu_getRegister(enum PPURegister reg) {
-    if (reg == PPU_CONTROL) {
-        return reg_control;
-    } else if (reg == PPU_MASK) {
-        return reg_mask;
-    } else if (reg == PPU_STATUS) {
-        uint8_t stat = reg_ppuStatus;
-        ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
-        addressLatch = false;
-        scrollLatch = false;
-        return stat;
-    } else if (reg == PPU_OAMADDR) {
-        return reg_oamaddr;
-    } else if (reg == PPU_OAMDATA) {
-        return oamRAM[reg_oamaddr];
-    } else if (reg == PPU_SCROLL) {
-        return reg_scroll;
-    } else if (reg == PPU_PPUDATA) {
-        if (addressBuffer < 0x3F00) {
-            reg_ppudata = dataBuffer;
-            dataBuffer = ppu_readMem(addressBuffer);
-        } else {
-            reg_ppudata = ppu_readMem(addressBuffer);
-        }
-        addressBuffer += ppu_getControlFlag(PPUCTRL_INCREMENT) ? 32 : 1;
-        return reg_ppudata;
-    } else if (reg == PPU_PPUADDR) {
-        return reg_ppuaddr;
-    } else if (reg == PPU_OAMDMA) {
-        return reg_oamdma;
+uint8_t ppu_getRegister(PPURegisterType r) {
+  switch (r) {
+    case PPU_CONTROL: return ppureg.control;
+    case PPU_MASK: return ppureg.mask;
+    case PPU_STATUS: {
+      uint8_t stat = ppureg.ppuStatus;
+      ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
+      addressLatch = false;
+      scrollLatch = false;
+      return stat;
     }
-    return 0;
+    case PPU_OAMADDR: return ppureg.oamaddr;
+    case PPU_OAMDATA: return oamRAM[ppureg.oamaddr];
+    case PPU_SCROLL: return ppureg.scroll;
+    case PPU_PPUDATA: {
+      if (addressBuffer < 0x2000) { // chr
+        ppureg.ppudata = dataBuffer;
+        dataBuffer = chrROM[addressBuffer & 0x3FFF];
+      } else if (addressBuffer < 0x3F00) { // nametable
+        ppureg.ppudata = dataBuffer;
+        dataBuffer = vidRAM[addressBuffer - 0x2000];
+      } else { // palette
+        ppureg.ppudata = paletteRAM[addressBuffer - 0x3F00];
+      }
+      addressBuffer += ppu_getControlFlag(PPUCTRL_INCREMENT) ? 32 : 1;
+      return ppureg.ppudata;
+    }
+    case PPU_PPUADDR: return ppureg.ppuaddr;
+    case PPU_OAMDMA: return ppureg.oamdma;
+  }
+  return 0;
 }
 
-void ppu_setRegister(enum PPURegister reg, uint8_t data) {
-    if (reg == PPU_CONTROL) {
-        reg_control = data;
-    } else if (reg == PPU_MASK) {
-        reg_mask = data;
-    } else if (reg == PPU_STATUS) {
-        reg_ppuStatus = data;
-        addressLatch = false;
-        scrollLatch = false; 
-        ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
-    } else if (reg == PPU_OAMADDR) {
-        reg_oamaddr = data;
-    } else if (reg == PPU_OAMDATA) {
-        reg_oamdata = data;
-        oamRAM[reg_oamaddr] = reg_oamdata;
-    } else if (reg == PPU_SCROLL) {
-        if (scrollLatch) {
-            scrollY = data;
-            scrollLatch = false;
-        } else {
-            scrollX = data;
-            scrollLatch = true;
-        }
-        reg_scroll = data;
-    } else if (reg == PPU_PPUDATA) {
-        reg_ppudata = data;
-        ppu_writeMem(addressBuffer, reg_ppudata);
-        addressBuffer += ppu_getControlFlag(PPUCTRL_INCREMENT) ? 32 : 1;
-    } else if (reg == PPU_PPUADDR) {
-        if (addressLatch) {
-            addressBuffer = ((uint16_t) reg_ppuaddr) << 8;
-            addressBuffer |= (uint16_t) data;
-            addressLatch = false;
-        } else {
-            reg_ppuaddr = data;
-            addressLatch = true;
-        }
-    } else if (reg == PPU_OAMDMA) {
-        uint16_t startAddr = ((uint16_t) data) << 8;
-        for (int i = 0; i < 256; i++) {
-            oamRAM[i] = readCPUDirect(startAddr + i);
-        }
-        reg_oamdma = data;
+void ppu_setRegister(PPURegisterType r, uint8_t data) {
+  switch (r) {
+    case PPU_CONTROL: {
+      ppureg.control = data;
+      break;
     }
+    case PPU_MASK: {
+      ppureg.mask = data;
+      break;
+    }
+    case PPU_STATUS: {
+      ppureg.ppuStatus = data;
+      addressLatch = false;
+      scrollLatch = false;
+      ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
+      break;
+    }
+    case PPU_OAMADDR: {
+      ppureg.oamaddr = data;
+      break;
+    }
+    case PPU_OAMDATA: {
+      ppureg.oamdata = data;
+      oamRAM[ppureg.oamaddr] = ppureg.oamdata;
+      break;
+    }
+    case PPU_SCROLL: {
+      scrollLatch ? (scrollY = data) : (scrollX = data);
+      scrollLatch = !scrollLatch;
+      ppureg.scroll = data;
+      break;
+    }
+    case PPU_PPUDATA: {
+      ppureg.ppudata = data;
+      ppu_writeMem(addressBuffer, ppureg.ppudata);
+      addressBuffer += ppu_getControlFlag(PPUCTRL_INCREMENT) ? 32 : 1;
+      break;
+    }
+    case PPU_PPUADDR: {
+      if (addressLatch) {
+        addressBuffer = ((uint16_t) ppureg.ppuaddr) << 8;
+        addressBuffer |= (uint16_t) data;
+        addressLatch = false;
+      } else {
+        ppureg.ppuaddr = data;
+        addressLatch = true;
+      }
+      break;
+    }
+    case PPU_OAMDMA: {
+      uint16_t startAddr = ((uint16_t) data) << 8;
+      for (int i = 0; i < 256; i++) {
+        oamRAM[i] = readCPUDirect(startAddr + i);
+      }
+      break;
+    }
+  }
 }
 
 static force_inline uint8_t ppu_readMem(uint16_t address) {

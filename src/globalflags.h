@@ -3,6 +3,7 @@
 
 #define TRUE 1
 #define FALSE 0
+
 #define force_inline __attribute__((always_inline)) inline
 
 /**
@@ -47,6 +48,20 @@
  */
 #define DISPLAY_SCALE 2
 
+/**
+ * @brief Allow PPU to catch up with CPU after every instruction.
+ *        Otherwise, if faslse, catch up every frame
+ */
+#define PPU_IMMEDIATE_CATCHUP TRUE
+
+/**
+ * @brief Determine how the CPU should handle programs
+ *        CPUEMU_INTERPRET_DIRECT - Decode instruction every time 
+ *                                  it is encountered.
+ *        CPUEMU_INTERPRET_CACHED - Store encountered instructions as
+ *                                  bytecode for quicker decoding.
+ *       
+ */
 #define EMU_MODE CPUEMU_INTERPRET_CACHED
 
 // magic numbers
@@ -63,7 +78,11 @@
 
 #define CPU_FREQUENCY 1789773
 
-#define CPU_FRAME_CLOCKS 29780
+#define CPU_FRAME_CYCLES 29780
+
+#define PPU_FRAME_CYCLES 89340
+
+#define PPU_SCANLINE_CYCLES 341
 
 #define BIT_FILL_0 0x0
 #define BIT_FILL_1 0x1
