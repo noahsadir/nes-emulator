@@ -29,6 +29,7 @@ uint8_t* prgRAM = NULL;
 
 INES cartridge;
 char trace[150];
+char debugOverlayString[32];
 
 bool cpuPaused = false;
 bool audioEnabled = false;
@@ -54,6 +55,7 @@ struct timeval pd1, pd2;
 #endif
 
 void bus_init(FileBinary* bin) {
+  debugOverlayString[0] = '\0';
   #if (PERFORMANCE_DEBUG)
   gettimeofday(&t1, NULL);
   gettimeofday(&pd1, NULL);
@@ -393,44 +395,44 @@ void bus_frameIntervalReport() {
 }
 
 void bus_ppuReport() {
-  char str[32];
-  str[0] = '\0';
+  // If desired, alculate & display framerate and CPU frequency
   #if (PERFORMANCE_DEBUG)
   gettimeofday(&pd2, NULL); // poll delay
-  uint32_t delayCounter = (pd2.tv_sec - pd1.tv_sec) * 1000000.0;
-  delayCounter += (pd2.tv_usec - pd1.tv_usec);
+  uint32_t delayCounter = (pd2.tv_sec - pd1.tv_sec);
   framesElapsed += 1;
-  if (delayCounter >= 1000000) {
+  if (delayCounter >= 1) {
     freqHertz = cyclesPerSec;
     framerate = framesElapsed;
     framesElapsed = 0;
     cyclesPerSec = 0;
     gettimeofday(&pd1, NULL);
-  }
-  uint32_t fq = freqHertz;
-  uint32_t fr = framerate;
-  for (int i = 8; i >= 0; i--) {
-    if (i < 3) {
-      str[i] = '0' + (fq % 10);
-    } else if (i < 6) {
-      str[i + 1] = '0' + (fq % 10);
-      str[i] = '.';
+    uint32_t fq = freqHertz;
+    uint32_t fr = framerate;
+    // This is ugly, but it reduces dependency & overhead from sprintf
+    for (int i = 8; i >= 0; i--) {
+      if (i < 3) {
+        debugOverlayString[i] = '0' + (fq % 10);
+      } else if (i < 6) {
+        debugOverlayString[i + 1] = '0' + (fq % 10);
+        debugOverlayString[i] = '.';
+      }
+      fq /= 10;
     }
-    fq /= 10;
+    debugOverlayString[7] = '\0';
+    strcat(debugOverlayString, " MHz (");
+    for (int i = 16; i >= 13; i--) {
+      debugOverlayString[i] = '0' + (fr % 10);
+      fr /= 10;
+    }
+    debugOverlayString[17] = '\0';
+    strcat(debugOverlayString, " FPS)");
   }
-  str[7] = '\0';
-  strcat(str, " MHz (");
-  for (int i = 16; i >= 13; i--) {
-    str[i] = '0' + (fr % 10);
-    fr /= 10;
-  }
-  str[17] = '\0';
-  strcat(str, " FPS)");
   #endif
 
   #if (!HEADLESS)
-  io_update(str);
+  io_update(debugOverlayString);
   #endif
+  
   io_pollJoypad(&bus_handleInput);
 }
 

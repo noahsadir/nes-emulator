@@ -229,7 +229,7 @@ void ppu_drawRAMPalette();
  * @param colorID the color ID
  * @return uint32_t the RGB color
  */
-uint32_t ppu_getColor(uint8_t palette, uint8_t colorID);
+static inline uint32_t ppu_getColor(uint8_t palette, uint8_t colorID);
 
 
 /**
@@ -249,7 +249,7 @@ void ppu_drawTile(bool bank, uint16_t tileID, uint8_t palette, uint16_t x, uint1
  * @param x the x location on the bitmap
  * @param y the y location on the bitmap
  */
-void ppu_setPixel(uint32_t color, int16_t x, int16_t y);
+static inline void ppu_setPixel(uint32_t color, int16_t x, int16_t y);
 
 /**
  * @brief Draw a scanline
@@ -264,7 +264,7 @@ void ppu_drawScanline(uint8_t y);
  * @param address the address to read
  * @return uint8_t the data from the specified address
  */
-uint8_t ppu_readMem(uint16_t address);
+static force_inline uint8_t ppu_readMem(uint16_t address);
 
 /**
  * @brief Perform write operation at mapped address
@@ -272,6 +272,6 @@ uint8_t ppu_readMem(uint16_t address);
  * @param address the address to write to
  * @param data the data to write
  */
-void ppu_writeMem(uint16_t address, uint8_t data);
+static force_inline void ppu_writeMem(uint16_t address, uint8_t data);
 
 #endif

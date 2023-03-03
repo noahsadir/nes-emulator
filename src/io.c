@@ -37,6 +37,10 @@ uint32_t panicbmp[DISPLAY_BITMAP_SIZE];
 
 bool didPanic = false;
 
+int counter = 0;
+
+struct timeval t1, t2;
+
 void io_init(uint16_t scl) {
   scale = scl;
   SDL_Init(SDL_INIT_VIDEO);
@@ -55,7 +59,7 @@ void io_init(uint16_t scl) {
 void io_pollJoypad(void(*toggle)(NESInput, bool)) {
   // read key events
   SDL_Event event;
-  while (SDL_PollEvent(&event)) {
+  if (SDL_PollEvent(&event)) {
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == keyMap.up) {
         toggle(INPUT_UP, true);
@@ -171,40 +175,52 @@ void io_printChar(char chr, uint8_t x, uint8_t y) {
 }
 
 void io_update(char* overlay) {
-  if (overlay != NULL) {
-    io_printString(overlay, 4, 4);
-    return;
-  }
-  // update display
-  SDL_FreeSurface(surface);
-  uint32_t* pixels = (uint32_t*)surface->pixels;
-  SDL_LockSurface(surface);
+  gettimeofday(&t2, NULL);
+  uint32_t delayCounter = (t2.tv_sec - t1.tv_sec) * 1000000.0;
+  delayCounter += (t2.tv_usec - t1.tv_usec);
 
-  if (didPanic) {
-    for (int i = 0; i < 256 * 240; i++) {
-      int x = i % 256;
-      int y = i / 256;
-      int scaleSquared = scale * scale;
-      for (int subpix = 0; subpix < scaleSquared; subpix++) {
-        int px = subpix % scale;
-        int py = subpix / scale;
-        pixels[(x * scale) + (y * scaleSquared * width) + px + (py * width * scale)] = panicbmp[i];
+  if (delayCounter >= MIN_DRAW_INTERVAL) {
+    delayCounter = 0;
+    if (overlay != NULL) {
+      io_printString(overlay, 4, 4);
+      return;
+    }
+    // update display
+    SDL_FreeSurface(surface);
+    uint32_t* pixels = (uint32_t*)surface->pixels;
+    SDL_LockSurface(surface);
+
+    if (didPanic) {
+      for (int i = 0; i < 256 * 240; i++) {
+        int x = i % 256;
+        int y = i / 256;
+        int scaleSquared = scale * scale;
+        for (int subpix = 0; subpix < scaleSquared; subpix++) {
+          int px = subpix % scale;
+          int py = subpix / scale;
+          pixels[(x * scale) + (y * scaleSquared * width) + px + (py * width * scale)] = panicbmp[i];
+        }
+      }
+    } else {
+      for (int i = 0; i < 256 * 240; i++) {
+        int x = i % 256;
+        int y = i / 256;
+        int scaleSquared = scale * scale;
+        for (int subpix = 0; subpix < scaleSquared; subpix++) {
+          int px = subpix % scale;
+          int py = subpix / scale;
+          pixels[(x * scale) + (y * scaleSquared * width) + px + (py * width * scale)] = bitmap[i];
+        }
       }
     }
-  } else {
-    for (int i = 0; i < 256 * 240; i++) {
-      int x = i % 256;
-      int y = i / 256;
-      int scaleSquared = scale * scale;
-      for (int subpix = 0; subpix < scaleSquared; subpix++) {
-        int px = subpix % scale;
-        int py = subpix / scale;
-        pixels[(x * scale) + (y * scaleSquared * width) + px + (py * width * scale)] = bitmap[i];
-      }
-    }
+    
+
+    SDL_UnlockSurface(surface);
+  
+    gettimeofday(&t1, NULL);
+    SDL_UpdateWindowSurface(window);
+    counter = 0;
   }
   
-
-  SDL_UnlockSurface(surface);
-  SDL_UpdateWindowSurface(window);
+  counter += 1;
 }

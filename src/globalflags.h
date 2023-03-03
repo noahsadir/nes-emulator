@@ -3,6 +3,7 @@
 
 #define TRUE 1
 #define FALSE 0
+#define force_inline __attribute__((always_inline)) inline
 
 /**
  * @brief Platform value
@@ -14,14 +15,36 @@
  */
 #define PLATFORM 0
 
+/**
+ * @brief Toggle verbose exceptions.
+ */
 #define VERBOSE_EXC FALSE
 
+/**
+ * @brief Generate CPU trace.
+ */
 #define LOGGING FALSE
 
+/**
+ * @brief Record & display perfomance metrics.
+ */
 #define PERFORMANCE_DEBUG TRUE
 
+/**
+ * @brief Run in headless mode (PPU will not render)
+ */
 #define HEADLESS FALSE
 
+/**
+ * @brief Minimum number of microseconds which must occur
+ *        before the display is re-rendered.
+ *        NOTE: PPU will continue to render scanlines
+ */
+#define MIN_DRAW_INTERVAL 16667
+
+/**
+ * @brief Set the display scale.
+ */
 #define DISPLAY_SCALE 2
 
 #define EMU_MODE CPUEMU_INTERPRET_CACHED

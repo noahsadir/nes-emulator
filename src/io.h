@@ -34,6 +34,8 @@
 
 #include <SDL2/SDL.h>
 #include <stdint.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 struct JoypadMapping {
     SDL_KeyCode up;

@@ -107,7 +107,7 @@ void ppu_scanline() {
     }
 }
 
-void ppu_setPixel(uint32_t color, int16_t x, int16_t y) {
+static inline void ppu_setPixel(uint32_t color, int16_t x, int16_t y) {
     if (x >= 0 && x < 256 && y >= 0 && y < 240) {
         uint16_t location = (y * 256) + x;
         bitmap[location] = color;
@@ -154,7 +154,6 @@ void ppu_drawScanline(uint8_t y) {
         containsSpriteZero = true;
     }
 
-    // i <3 maf
     if (ppu_getMaskFlag(PPUMASK_SHOWBKG)) {
         for (uint8_t tileCol = 0; tileCol < 33; tileCol++) {
             
@@ -266,7 +265,7 @@ void ppu_drawRAMPalette() {
     }
 }
 
-uint32_t ppu_getColor(uint8_t palette, uint8_t colorID) {
+static inline uint32_t ppu_getColor(uint8_t palette, uint8_t colorID) {
     return ppu_colors[ppu_readMem(0x3F00 + (palette << 2) + colorID)];
 }
 
@@ -390,10 +389,9 @@ void ppu_setRegister(enum PPURegister reg, uint8_t data) {
     }
 }
 
-uint8_t ppu_readMem(uint16_t address) {
-  address = address & 0x3FFF;
+static force_inline uint8_t ppu_readMem(uint16_t address) {
   if (address < 0x2000) { // chr rom
-    return chrROM[address];
+    return chrROM[address & 0x3FFF];
   } else if (address < 0x3F00) { // vram
     return vidRAM[address & 0x1FFF];
   } else if (address < 0x4000) {
@@ -406,7 +404,7 @@ uint8_t ppu_readMem(uint16_t address) {
   return 0x00;
 }
 
-void ppu_writeMem(uint16_t address, uint8_t data) {
+static force_inline void ppu_writeMem(uint16_t address, uint8_t data) {
   address = address & 0x3FFF;
   if (address < 0x2000) { // chr rom
     // read only -- invalid operation
