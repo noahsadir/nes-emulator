@@ -84,7 +84,7 @@ void io_update(char* overlay);
  * 
  * @param str 
  */
-void io_printString(char* str, uint8_t x, uint8_t y);
+void io_printString(char* str, uint16_t x, uint8_t y);
 
 /**
  * @brief Trigger panic
@@ -100,6 +100,11 @@ void io_panic(char* str);
  * @param x the x coordinate
  * @param y the y coordinate
  */
-void io_printChar(char chr, uint8_t x, uint8_t y);
+void io_printChar(char chr, uint16_t x, uint8_t y);
 
+/**
+ * @brief Draw all 4 nametables from VRAM
+ *        Useful for debugging
+ */
+void io_drawDebugNametable();
 #endif

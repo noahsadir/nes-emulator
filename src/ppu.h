@@ -248,7 +248,7 @@ void ppu_drawRAMPalette();
  * @param x the x position
  * @param y the y position
  */
-void ppu_drawTile(bool bank, uint16_t tileID, uint8_t palette, uint16_t x, uint16_t y);
+static force_inline void ppu_drawTile(bool flipHorizontally, bool flipVertically, bool transparent, bool behindBackground, bool background, uint16_t tileID, uint8_t palette, uint16_t x, uint16_t y);
 
 /**
  * @brief Set a pixel on the bitmap

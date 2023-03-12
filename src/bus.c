@@ -42,12 +42,13 @@ int32_t cyclesUntilSecond = 0;
 uint64_t frameIntervalCount = 0;
 uint32_t cpuTimeCount = 0;
 uint32_t ppuCycleDebt = 0;
+uint32_t cyclesPerSec = 0;
 
 #if (PERFORMANCE_DEBUG)
 uint32_t framesElapsed = 0;
 uint32_t framesPerSec = 0;
 double usecsElapsed = 0;
-uint32_t cyclesPerSec = 0;
+
 uint32_t freqHertz;
 uint32_t framerate;
 struct timeval t1, t2;
@@ -85,7 +86,10 @@ void bus_init(FileBinary* bin) {
   // initialize hardware
   ppu_init(cartridge.chrRom, cartridge.header.mirroringType == MIRRORING_VERTICAL, &bus_readCPU, &bus_ppuReport);
   cpu6502_init(&bus_writeCPU, &bus_readCPU, mode);
-  //bus_initClock();
+
+  #if (LIMIT_CLOCK_SPEED)
+  bus_initClock();
+  #endif
 
   // determine if emulator should run in disassembly mode or not
   if (mode == CPUEMU_DISASSEMBLE) {

@@ -25,6 +25,7 @@
 #include "io.h"
 
 SDL_Window* window;
+
 SDL_Surface* surface;
 
 struct JoypadMapping keyMap;
@@ -44,8 +45,14 @@ struct timeval t1, t2;
 void io_init(uint16_t scl) {
   scale = scl;
   SDL_Init(SDL_INIT_VIDEO);
+  #if (PERFORMANCE_DEBUG)
+  window = SDL_CreateWindow("Emulator (Debug Mode)", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width * scale * 2, height * scale, SDL_WINDOW_SHOWN);
+  #else
   window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width * scale, height * scale, SDL_WINDOW_SHOWN);
+  #endif
+  
   surface = SDL_GetWindowSurface(window);
+  
   keyMap.up = SDLK_w;
   keyMap.down = SDLK_s;
   keyMap.left = SDLK_a;
@@ -135,7 +142,9 @@ void io_panic(char* str) {
   }
 }
 
-void io_printString(char* str, uint8_t x, uint8_t y) {
+void io_printString(char* str, uint16_t x, uint8_t y) {
+  bool isDebugScreen = (x >= 256);
+  if (isDebugScreen) x -= 256;
   while (*str != '\0') {
     if (x >= 248 || *str == '\n') {
       x = 0;
@@ -143,7 +152,7 @@ void io_printString(char* str, uint8_t x, uint8_t y) {
     }
 
     if (*str != '\n') {
-      io_printChar(*str, x, y);
+      io_printChar(*str, isDebugScreen ? (x + 256) : x, y);
       x += 8;
       str += 1;
     }
@@ -151,13 +160,17 @@ void io_printString(char* str, uint8_t x, uint8_t y) {
   io_update(NULL);
 }
 
-void io_printChar(char chr, uint8_t x, uint8_t y) {
+void io_printChar(char chr, uint16_t x, uint8_t y) {
+  bool isDebugScreen = (x >= 256);
+  if (isDebugScreen) x -= 256;
   int pos = (y * DISPLAY_WIDTH) + x;
   uint64_t charPix = font[chr & 127];
   int8_t shift = 63;
   for (int row = 0; row < 8; row++) {
     for (int col = 0; col < 8; col++) {
-      if (didPanic) {
+      if (isDebugScreen) {
+        debugbmp[pos] = ((charPix >> shift) & 1) ? 0xFFFFFF : 0x000000;
+      } else if (didPanic) {
         if (y == 64) {
           panicbmp[pos] = ((charPix >> shift) & 1) ? 0xFFFFFF : colors[0x06];
         } else {
@@ -174,15 +187,41 @@ void io_printChar(char chr, uint8_t x, uint8_t y) {
   }
 }
 
+void io_drawDebugNametable() {
+#if (PERFORMANCE_DEBUG)
+  // this code is ugly but it's for debug purposes so whatever
+  if (DISPLAY_SCALE == 2) {
+    int dispX = 0;
+    int dispY = 0;
+    for (int i = 0; i < 0x2000; i++) {
+      int ntID = i / 0x400;
+      int ntRow = (i - (ntID * 0x400)) / 32;
+      int ntCol = (i - (ntID * 0x400)) % 32;
+      if ((i - (ntID * 0x400)) < 960) {
+        for (int k = 0; k < 64; k++) {
+          int tileCol = 8 - (k % 8);
+          int tileRow = k / 8;
+          debugbmp[(ntRow * 512 * 8) + (ntCol * 8) + (tileRow * 512) + tileCol + ((ntID % 2) * 256) + ((ntID > 1) * (DISPLAY_BITMAP_SIZE * 2))] = colors[(chrCache[vidRAM[i] + (256 * DBG_BKG_BANK)][k] * 3) + 15];
+        }
+      }
+    }
+    
+  } else {
+    io_printString(" * Display scale must be 2 * ", 256, 24);
+  }
+#endif
+}
+
 void io_update(char* overlay) {
   gettimeofday(&t2, NULL);
   uint32_t delayCounter = (t2.tv_sec - t1.tv_sec) * 1000000.0;
   delayCounter += (t2.tv_usec - t1.tv_usec);
-
+  
   if (delayCounter >= MIN_DRAW_INTERVAL || didPanic) {
     delayCounter = 0;
     if (overlay != NULL) {
       io_printString(overlay, 4, 4);
+      io_drawDebugNametable();
       return;
     }
     // update display
@@ -190,6 +229,40 @@ void io_update(char* overlay) {
     uint32_t* pixels = (uint32_t*)surface->pixels;
     SDL_LockSurface(surface);
 
+#if (PERFORMANCE_DEBUG)
+    if (didPanic) {
+      for (int i = 0; i < 512 * 240; i++) {
+        int x = i % 512;
+        int y = i / 512;
+        int scaleSquared = scale * scale;
+        for (int subpix = 0; subpix < scaleSquared; subpix++) {
+          int px = subpix % scale;
+          int py = subpix / scale;
+          if (x < 256) {
+            pixels[(x * scale) + (y * scaleSquared * (width * 2)) + px + (py * (width * 2) * scale)] = panicbmp[(y * 256) + x];
+          }
+        }
+      }
+    } else {
+      for (int i = 0; i < 512 * 240; i++) {
+        int x = i % 512;
+        int y = i / 512;
+        int scaleSquared = scale * scale;
+        for (int subpix = 0; subpix < scaleSquared; subpix++) {
+          int px = subpix % scale;
+          int py = subpix / scale;
+          if (x < 256) {
+            pixels[(x * scale) + (y * scaleSquared * (width * 2)) + px + (py * (width * 2) * scale)] = bitmap[(y * 256) + x];
+          }
+        }
+      }
+    }
+    for (int i = 0; i < DISPLAY_PIXEL_SIZE; i++) {
+      int x = i % (DISPLAY_WIDTH * DISPLAY_SCALE);
+      int y = i / (DISPLAY_WIDTH * DISPLAY_SCALE);
+      pixels[(y * (DISPLAY_WIDTH * DISPLAY_SCALE * 2)) + x + (DISPLAY_WIDTH * DISPLAY_SCALE)] = debugbmp[i];
+    }
+#else
     if (didPanic) {
       for (int i = 0; i < 256 * 240; i++) {
         int x = i % 256;
@@ -213,6 +286,7 @@ void io_update(char* overlay) {
         }
       }
     }
+#endif
     
 
     SDL_UnlockSurface(surface);

@@ -43,6 +43,8 @@
  */
 #define MIN_DRAW_INTERVAL 16667
 
+#define LIMIT_CLOCK_SPEED TRUE
+
 /**
  * @brief Set the display scale.
  */
@@ -52,7 +54,7 @@
  * @brief Allow PPU to catch up with CPU after every instruction.
  *        Otherwise, if faslse, catch up every frame
  */
-#define PPU_IMMEDIATE_CATCHUP TRUE
+#define PPU_IMMEDIATE_CATCHUP FALSE
 
 /**
  * @brief Determine how the CPU should handle programs
@@ -72,6 +74,8 @@
 
 #define DISPLAY_BITMAP_SIZE (DISPLAY_WIDTH * DISPLAY_HEIGHT)
 
+#define DISPLAY_PIXEL_SIZE ((DISPLAY_WIDTH * DISPLAY_SCALE) * (DISPLAY_HEIGHT * DISPLAY_SCALE))
+
 #define DISPLAY_FRAMERATE 60
 
 #define DISPLAY_FRAME_USEC 16667
@@ -83,6 +87,9 @@
 #define PPU_FRAME_CYCLES 89340
 
 #define PPU_SCANLINE_CYCLES 341
+
+// manually define background bank for debug nametable
+#define DBG_BKG_BANK 1
 
 #define BIT_FILL_0 0x0
 #define BIT_FILL_1 0x1
@@ -263,8 +270,6 @@ typedef struct {
   uint8_t p;
 } CPURegisters;
 
-extern uint32_t bitmap[DISPLAY_BITMAP_SIZE];
-
 static const uint32_t colors[64] =
 {
 0x757575, 0x271B8F, 0x0000AB, 0x47009F, 0x8F0077, 0xAB0013, 0xA70000, 0x7F0B00,
@@ -276,5 +281,12 @@ static const uint32_t colors[64] =
 0xFFFFFF, 0xABE7FF, 0xC7D7FF, 0xD7CBFF, 0xFFC7FF, 0xFFC7DB, 0xFFBFB3, 0xFFDBAB,
 0xFFE7A3, 0xE3FFA3, 0xABF3BF, 0xB3FFCF, 0x9FFFF3, 0x000000, 0x000000, 0x000000
 };
+
+extern uint32_t bitmap[DISPLAY_BITMAP_SIZE];
+extern uint8_t oamRAM[0x00FF];
+extern uint8_t vidRAM[0x2000];
+extern uint8_t paletteRAM[32];
+extern uint8_t chrCache[512][64];
+extern uint32_t debugbmp[DISPLAY_PIXEL_SIZE];
 
 #endif
