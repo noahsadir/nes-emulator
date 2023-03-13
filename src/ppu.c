@@ -360,22 +360,6 @@ static force_inline void ppu_drawScanline(uint8_t y) {
   }
 }
 
-void ppu_drawRAMPalette() {
-    for (int i = 0; i < 32; i++) {
-        uint16_t x = ((i % 16) + ((i % 16) / 4)) + 1;
-        uint16_t y = (i / 16) * 2;
-        uint16_t location = (y * 256 * 8) + (x * 8);
-        uint32_t color = colors[ppu_readMem(0x3F00 + i)];
-        for (int j = 0; j < 64; j++) {
-            location += 1;
-            if (j % 8 == 0) {
-                location += 248;
-            }
-            bitmap[location] = color;
-        }
-    }
-}
-
 void ppu_setStatusFlag(enum PPUStatusFlag flag, bool enable) {
   if (enable) {
     ppureg.ppuStatus |= flag;
