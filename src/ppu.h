@@ -202,11 +202,6 @@ void ppu_drawCHRROM(uint16_t bank);
 void ppu_generateChrCache();
 
 /**
- * @brief Draw the RAM Palette
- */
-void ppu_drawRAMPalette();
-
-/**
  * @brief Draw a tile on the screen
  * 
  * @param bank the tile bank

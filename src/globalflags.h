@@ -41,7 +41,7 @@
  *        before the display is re-rendered.
  *        NOTE: PPU will continue to render scanlines
  */
-#define MIN_DRAW_INTERVAL 16667
+#define MIN_DRAW_INTERVAL 8333
 
 /**
  * @brief Limit clock speed to original NES (1.789773 MHz)
@@ -59,7 +59,7 @@
  *        NOTE: This also affects PPU-will operate at scanline-level granularity
  *              if enabled, or just frame-level granularity if not
  */
-#define PPU_IMMEDIATE_CATCHUP TRUE
+#define PPU_IMMEDIATE_CATCHUP FALSE
 
 /**
  * @brief Determine how the CPU should handle programs
