@@ -1,4 +1,4 @@
-CFLAGS = -Wall
+CFLAGS = -Wall -pedantic-errors
 SRC = ./src
 OBJ = ./obj
 BIN = ./bin
