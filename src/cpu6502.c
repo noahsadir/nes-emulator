@@ -690,6 +690,7 @@ static force_inline void cpu6502_parseOpcode(uint8_t opcode, Bytecode* b) {
 
 static force_inline uint8_t cpu6502_execute(Bytecode* b) {
   uint16_t val;
+  uint8_t cycleCount = 2;
   switch (b->addressingMode) {
     case AM_IMMEDIATE:
     {
@@ -698,11 +699,13 @@ static force_inline uint8_t cpu6502_execute(Bytecode* b) {
     }
     case AM_ABSOLUTE: 
     {
+      cycleCount += 2;
       val = ((uint16_t)b->data[2] << 8) | (uint16_t)b->data[1];
       break;
     }
     case AM_ZERO_PAGE: 
     {
+      cycleCount += 1;
       val = (uint16_t)b->data[1];
       break;
     }
@@ -720,28 +723,33 @@ static force_inline uint8_t cpu6502_execute(Bytecode* b) {
     }
     case AM_ABS_X:
     {
+      cycleCount += 2;
       val = (((uint16_t)b->data[2] << 8) | (uint16_t)b->data[1]) + (uint16_t)reg.x;
       break;
     }
     case AM_ABS_Y:
     {
+      cycleCount += 2;
       val = (((uint16_t)b->data[2] << 8) | (uint16_t)b->data[1]) + (uint16_t)reg.y;
       break;
     }
     case AM_ZP_X:
     {
+      cycleCount += 2;
       uint8_t zpVal = b->data[1] + reg.x;
       val = (uint16_t)zpVal;
       break;
     }
     case AM_ZP_Y:
     {
+      cycleCount += 2;
       uint8_t zpVal = b->data[1] + reg.y;
       val = (uint16_t)zpVal;
       break;
     }
     case AM_ZP_X_INDIRECT:
     {
+      cycleCount += 4;
       uint8_t zpVal = b->data[1] + reg.x;
       uint8_t zpValInc = zpVal + 1;
       val = ((uint16_t)memRead(zpValInc) << 8) | (uint16_t)memRead(zpVal);
@@ -749,6 +757,7 @@ static force_inline uint8_t cpu6502_execute(Bytecode* b) {
     }
     case AM_ZP_INDIRECT_Y:
     {
+      cycleCount += 3;
       uint8_t zpVal = b->data[1];
       uint8_t zpValInc = zpVal + 1;
       val = ((uint16_t)memRead(zpValInc) << 8) | (uint16_t)memRead(zpVal);
@@ -763,6 +772,7 @@ static force_inline uint8_t cpu6502_execute(Bytecode* b) {
     }
     default:
     {
+      cycleCount += 1;
       val = 0;
       break;
     }
@@ -1615,7 +1625,7 @@ static force_inline uint8_t cpu6502_execute(Bytecode* b) {
       break;
     }
   }
-  return 3;
+  return cycleCount;
 }
 
 uint8_t cpu6502_getErrno() {
