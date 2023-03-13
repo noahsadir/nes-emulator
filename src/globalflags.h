@@ -29,7 +29,7 @@
 /**
  * @brief Record & display perfomance metrics.
  */
-#define PERFORMANCE_DEBUG FALSE
+#define PERFORMANCE_DEBUG TRUE
 
 /**
  * @brief Run in headless mode (PPU will not render)

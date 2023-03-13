@@ -58,7 +58,7 @@ typedef struct {
   uint8_t ppuaddr;
   uint8_t ppudata;
   uint8_t oamdma;
-} Register;
+} PPURegisters;
 
 enum PPUControlFlag {
   PPUCTRL_NAMETABLE1 = 0b00000001,

@@ -24,7 +24,7 @@
 
 #include "ppu.h"
 
-Register ppureg;
+PPURegisters ppureg;
 
 uint16_t addressBuffer = 0x0000;
 uint8_t scrollX = 0;
