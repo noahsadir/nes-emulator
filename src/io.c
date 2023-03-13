@@ -188,11 +188,9 @@ void io_printChar(char chr, uint16_t x, uint8_t y) {
 }
 
 void io_drawDebugNametable() {
-#if (PERFORMANCE_DEBUG)
-  // this code is ugly but it's for debug purposes so whatever
+  // this is a bit ugly but mainly for debugging purposes
+  // just treat it like a black box that displays VRAM contents
   if (DISPLAY_SCALE == 2) {
-    int dispX = 0;
-    int dispY = 0;
     for (int i = 0; i < 0x2000; i++) {
       int ntID = i / 0x400;
       int ntRow = (i - (ntID * 0x400)) / 32;
@@ -205,11 +203,7 @@ void io_drawDebugNametable() {
         }
       }
     }
-    
-  } else {
-    io_printString(" * Display scale must be 2 * ", 256, 24);
   }
-#endif
 }
 
 void io_update(char* overlay) {
@@ -220,74 +214,40 @@ void io_update(char* overlay) {
   if (delayCounter >= MIN_DRAW_INTERVAL || didPanic) {
     delayCounter = 0;
     if (overlay != NULL) {
+      if (PERFORMANCE_DEBUG) {
+        if (DISPLAY_SCALE == 2) {
+          io_drawDebugNametable();
+        } else {
+          io_printString("Scale must be 2 for debugging!", 4, 4);
+        }
+      }
       io_printString(overlay, 4, 4);
-      io_drawDebugNametable();
       return;
     }
     // update display
     SDL_FreeSurface(surface);
     uint32_t* pixels = (uint32_t*)surface->pixels;
     SDL_LockSurface(surface);
-
-#if (PERFORMANCE_DEBUG)
-    if (didPanic) {
-      for (int i = 0; i < 512 * 240; i++) {
-        int x = i % 512;
-        int y = i / 512;
-        int scaleSquared = scale * scale;
-        for (int subpix = 0; subpix < scaleSquared; subpix++) {
-          int px = subpix % scale;
-          int py = subpix / scale;
-          if (x < 256) {
-            pixels[(x * scale) + (y * scaleSquared * (width * 2)) + px + (py * (width * 2) * scale)] = panicbmp[(y * 256) + x];
-          }
-        }
-      }
-    } else {
-      for (int i = 0; i < 512 * 240; i++) {
-        int x = i % 512;
-        int y = i / 512;
-        int scaleSquared = scale * scale;
-        for (int subpix = 0; subpix < scaleSquared; subpix++) {
-          int px = subpix % scale;
-          int py = subpix / scale;
-          if (x < 256) {
-            pixels[(x * scale) + (y * scaleSquared * (width * 2)) + px + (py * (width * 2) * scale)] = bitmap[(y * 256) + x];
-          }
+    for (int i = 0; i < (256 * (1 + PERFORMANCE_DEBUG)) * 240; i++) {
+      int x = i % (256 * (1 + PERFORMANCE_DEBUG));
+      int y = i / (256 * (1 + PERFORMANCE_DEBUG));
+      int scaleSquared = scale * scale;
+      for (int subpix = 0; subpix < scaleSquared; subpix++) {
+        int px = subpix % scale;
+        int py = subpix / scale;
+        if (x < 256) {
+          pixels[(x * scale) + (y * scaleSquared * (width * (1 + PERFORMANCE_DEBUG))) + px + (py * (width * (1 + PERFORMANCE_DEBUG)) * scale)] = didPanic ? panicbmp[(y * 256) + x] : bitmap[(y * 256) + x];
         }
       }
     }
+
+    #if (PERFORMANCE_DEBUG)
     for (int i = 0; i < DISPLAY_PIXEL_SIZE; i++) {
       int x = i % (DISPLAY_WIDTH * DISPLAY_SCALE);
       int y = i / (DISPLAY_WIDTH * DISPLAY_SCALE);
       pixels[(y * (DISPLAY_WIDTH * DISPLAY_SCALE * 2)) + x + (DISPLAY_WIDTH * DISPLAY_SCALE)] = debugbmp[i];
     }
-#else
-    if (didPanic) {
-      for (int i = 0; i < 256 * 240; i++) {
-        int x = i % 256;
-        int y = i / 256;
-        int scaleSquared = scale * scale;
-        for (int subpix = 0; subpix < scaleSquared; subpix++) {
-          int px = subpix % scale;
-          int py = subpix / scale;
-          pixels[(x * scale) + (y * scaleSquared * width) + px + (py * width * scale)] = panicbmp[i];
-        }
-      }
-    } else {
-      for (int i = 0; i < 256 * 240; i++) {
-        int x = i % 256;
-        int y = i / 256;
-        int scaleSquared = scale * scale;
-        for (int subpix = 0; subpix < scaleSquared; subpix++) {
-          int px = subpix % scale;
-          int py = subpix / scale;
-          pixels[(x * scale) + (y * scaleSquared * width) + px + (py * width * scale)] = bitmap[i];
-        }
-      }
-    }
-#endif
-    
+    #endif
 
     SDL_UnlockSurface(surface);
   

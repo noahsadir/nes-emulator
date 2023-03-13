@@ -50,6 +50,7 @@ uint16_t scanline = 0;
 uint16_t spriteZeroScanline = 0;
 uint16_t initialScrollX = 0;
 uint16_t initialScrollY = 0;
+uint16_t scanlineCycleCounter = 0;
 
 void(*callback)(uint32_t*);
 uint8_t(*readCPUDirect)(uint16_t);
@@ -78,11 +79,35 @@ void ppu_runCycles(uint32_t cycleCount) {
   #if (PPU_IMMEDIATE_CATCHUP)
   ppuCycles += cycleCount;
   if (ppuCycles >= 341) {
-    ppu_scanline();
+    // render scanlines
+    if (scanline >= 0 && scanline <= 239) {
+      ppu_drawScanline(scanline);
+    }
+
+    // render all at once rather than by scanline
+    if (scanline == 240) {
+      callback(bitmap);
+      ppuFrames += 1;
+    }
+
+    // start vblank
+    if (scanline == 241) {
+      ppu_setStatusFlag(PPUSTAT_VBLKSTART, true);
+    }
+
+    // end vblank
+    if (scanline == 261) {
+      ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
+      ppu_setStatusFlag(PPUSTAT_SPRITEZRO, false);
+      scanline = 0;
+    } else {
+      scanline += 1;
+    }
     ppuCycles -= 341;
   }
   #else
   ppuCycles += cycleCount;
+  scanlineCycleCounter += cycleCount;
 
   // ensures 1-scanline delay for sprite zero hit
   if (triggerSpriteZero == true) {
@@ -112,7 +137,10 @@ void ppu_runCycles(uint32_t cycleCount) {
   if (!triggerSpriteZero && ppu_getMaskFlag(PPUMASK_SHOWBKG) && ppu_getMaskFlag(PPUMASK_SHOWSPRIT) && oamRAM[0] <= sl && oamRAM[0] > sl - 8) {
     triggerSpriteZero = true;
     spriteZeroScanline = sl;
-    // account for mid-frame scroll changes
+  }
+
+  // store initial scroll values in case they're changed mid-scroll
+  if (sl == 0) {
     initialScrollX = scrollX;
     initialScrollY = scrollY;
   }
@@ -123,33 +151,6 @@ uint64_t ppu_getFrames() {
   return ppuFrames;
 }
 
-static force_inline void ppu_scanline() {
-  // render scanlines
-  if (scanline >= 0 && scanline <= 239) {
-    ppu_drawScanline(scanline);
-  }
-
-  // render all at once rather than by scanline
-  if (scanline == 240) {
-    callback(bitmap);
-    ppuFrames += 1;
-  }
-
-  // start vblank
-  if (scanline == 241) {
-    ppu_setStatusFlag(PPUSTAT_VBLKSTART, true);
-  }
-
-  // end vblank
-  if (scanline == 261) {
-    ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
-    ppu_setStatusFlag(PPUSTAT_SPRITEZRO, false);
-    scanline = 0;
-  } else {
-    scanline += 1;
-  }
-}
-
 static force_inline void ppu_setPixel(uint32_t color, int16_t x, int16_t y) {
   if (x >= 0 && x < 256 && y >= 0 && y < 240) bitmap[(y * 256) + x] = color;
 }
@@ -158,11 +159,20 @@ static force_inline void ppu_drawTile(bool flipHorizontally, bool flipVertically
   for (uint16_t row = 0; row < 8; row++) {
     for (uint16_t col = 0; col < 8; col++) {
       uint8_t color = chrCache[tileID][(row * 8) + col];
-      if ((transparent && color == 0) || behindBackground) continue;
-      if (background && color == 0) {
-        ppu_setPixel(ppu_colors[paletteRAM[0]], x + (flipHorizontally ? col : (7 - col)), y + (flipVertically ? (7 - row) : row));
+      if ((transparent && color == 0)) continue;
+      if (behindBackground) {
+        // before drawing behind-background sprite, check if this pixel
+        // is same as "clear" color (palette entry 0)
+        // not 100% accurate, but good enough for now
+        int16_t bmpX = x + (flipHorizontally ? col : (7 - col));
+        int16_t bmpY = y + (flipVertically ? (7 - row) : row);
+        if (bitmap[(bmpY * 256) + bmpX] == colors[paletteRAM[0]]) {
+          ppu_setPixel(colors[paletteRAM[(palette << 2) + color]], bmpX, bmpY);
+        }
+      } else if (background && color == 0) {
+        ppu_setPixel(colors[paletteRAM[0]], x + (flipHorizontally ? col : (7 - col)), y + (flipVertically ? (7 - row) : row));
       } else {
-        ppu_setPixel(ppu_colors[paletteRAM[(palette << 2) + color]], x + (flipHorizontally ? col : (7 - col)), y + (flipVertically ? (7 - row) : row));
+        ppu_setPixel(colors[paletteRAM[(palette << 2) + color]], x + (flipHorizontally ? col : (7 - col)), y + (flipVertically ? (7 - row) : row));
       }
     }
   }
@@ -211,7 +221,7 @@ static force_inline void ppu_drawFrame() {
   bool showBackground = ppu_getMaskFlag(PPUMASK_SHOWBKG);
   bool showSprite = ppu_getMaskFlag(PPUMASK_SHOWSPRIT);
 
-  // render all nametables
+  // render all nametables for simplicity's sake
   for (int n = 0; n < 4; n++) {
     for (int i = 0; i < 960; i++) {
       uint8_t ntRow = i / 32;
@@ -227,17 +237,16 @@ static force_inline void ppu_drawFrame() {
     }
   }
 
-  //printf("%d vs %d\n", scrollX, initialScrollX);
   // render visible background
   uint16_t ntRow, ntCol, ntPos, scrolledNametable;
-  for (int row = 0; row < 30; row++) {
+  for (int row = 0; row <= 30; row++) { // load 31 rows to account for scroll
     // determine scroll value based on sprite zero hit location
     uint8_t fineX = ((row * 8) > spriteZeroScanline ? scrollX : initialScrollX) % 8;
     uint8_t fineY = ((row * 8) > spriteZeroScanline ? scrollY : initialScrollY) % 8;
     uint8_t coarseX = ((row * 8) > spriteZeroScanline ? scrollX : initialScrollX) / 8;
     uint8_t coarseY = ((row * 8) > spriteZeroScanline ? scrollY : initialScrollY) / 8;
 
-    for (int col = 0; col < 32; col++) {
+    for (int col = 0; col <= 32; col++) { // load 33 rows to account for scroll
       // adjust row & tile for scroll
       ntCol = col + coarseX;
       ntRow = row + coarseY;
@@ -249,10 +258,14 @@ static force_inline void ppu_drawFrame() {
       scrolledNametable %= 4;
       ntPos = ((ntRow % 32) * 32) + (ntCol % 32);
 
+      // ignore above calculations if before sprite zero hit
+      if ((row * 8) <= spriteZeroScanline) scrolledNametable = 0; // a little hacky to just set nametable to 0
+
       if (showBackground) ppu_drawTile(false, false, false, false, true, bankOffset + nametables[scrolledNametable][ntPos], attributeTables[scrolledNametable][ntPos], (col * 8) - fineX, (row * 8) - fineY);
     }
   }
 
+  // draw sprites from OAM
   for (int i = 0; i < 256; i += 4) {
     uint8_t relY = oamRAM[i];
     uint8_t relX = oamRAM[i + 3];
@@ -260,99 +273,91 @@ static force_inline void ppu_drawFrame() {
     bool flipVertically = (oamRAM[i + 2] >> 7) & 1;
     bool isBehindBackground = (oamRAM[i + 2] >> 5) & 1;
     uint8_t paletteID = (oamRAM[i + 2]) & BIT_FILL_2;
+    // only draw sprite if visible and within visible bounds
     if (relY < 0xEF && relY != 0x00 && showSprite) ppu_drawTile(flipHorizontally, flipVertically, true, isBehindBackground, false, spriteBankOffset + oamRAM[i + 1], paletteID + 4, relX, relY);
   }
 }
 
 static force_inline void ppu_drawScanline(uint8_t y) {
-    uint8_t fineX = scrollX % 8;
-    uint8_t fineY = scrollY % 8;
-    uint8_t coarseX = scrollX / 8;
-    uint8_t coarseY = scrollY / 8;
-    uint8_t tileRow = y / 8;
+  uint8_t fineX = scrollX % 8;
+  uint8_t fineY = scrollY % 8;
+  uint8_t coarseX = scrollX / 8;
+  uint8_t coarseY = scrollY / 8;
+  uint8_t tileRow = y / 8;
 
-    uint8_t backgroundPixels[256];
-    bool containsSpriteZero = false;
+  uint16_t nametableID = (((((uint16_t) ppu_getControlFlag(PPUCTRL_NAMETABLE2)) << 1) | ((uint16_t) ppu_getControlFlag(PPUCTRL_NAMETABLE1))) * 0x0400);
+  uint16_t bankOffset = 256 * ppu_getControlFlag(PPUCTRL_BKGPATT);
+  uint16_t spriteBankOffset = 256 * ppu_getControlFlag(PPUCTRL_SPRITEPATT);
+  
+  bool containsSpriteZero = false;
+  bool showBackground = ppu_getMaskFlag(PPUMASK_SHOWBKG);
+  bool showSprite = ppu_getMaskFlag(PPUMASK_SHOWSPRIT);
 
-    uint16_t nametableOffset = (((((uint16_t) ppu_getControlFlag(PPUCTRL_NAMETABLE2)) << 1) | ((uint16_t) ppu_getControlFlag(PPUCTRL_NAMETABLE1))) * 0x0400);
-    uint16_t bankOffset = 256 * ppu_getControlFlag(PPUCTRL_BKGPATT);
-    uint16_t spriteBankOffset = 256 * ppu_getControlFlag(PPUCTRL_SPRITEPATT);
+  // ensures 1-scanline delay for sprite zero hit
+  if (triggerSpriteZero == true) {
+    ppu_setStatusFlag(PPUSTAT_SPRITEZRO, true);
+    triggerSpriteZero = false;
+  }
 
-    // ensures 1-scanline delay for sprite zero hit
-    if (triggerSpriteZero == true) {
-        ppu_setStatusFlag(PPUSTAT_SPRITEZRO, true);
-        triggerSpriteZero = false;
+  // indicate that sprite zero is present in the scanline
+  if (showBackground && showSprite && oamRAM[0] <= y && oamRAM[0] > y - 8) {
+    containsSpriteZero = true;
+  }
+
+  // draw background
+  for (uint8_t tileCol = 0; tileCol < 33; tileCol++) {
+    uint8_t adjCol = ((tileCol + coarseX) % 32);
+    uint8_t adjRow = ((tileRow + coarseY) % 32);
+
+    uint16_t nametablePos = nametableID + (((tileCol + coarseX) / 32) * 0x0400);
+    
+    // cycle 2-3
+    uint8_t nametableByte = vidRAM[nametablePos + adjCol + (adjRow * 32)];
+
+    // cycle 3-4
+    uint8_t attributeByte = vidRAM[nametablePos + 0x03C0 + (adjCol / 4) + ((adjRow / 4) * 8)];
+    if ((adjCol / 2) % 2 == 1) {
+        attributeByte >>= 2;
     }
-
-    // indicate that sprite zero is present in the scanline
-    if (ppu_getMaskFlag(PPUMASK_SHOWBKG) && ppu_getMaskFlag(PPUMASK_SHOWSPRIT) && oamRAM[0] <= y && oamRAM[0] > y - 8) {
-        containsSpriteZero = true;
+    if ((adjRow / 2) % 2 == 1) {
+        attributeByte >>= 4;
     }
+    attributeByte &= 0b00000011;
 
-    if (ppu_getMaskFlag(PPUMASK_SHOWBKG)) {
-        for (uint8_t tileCol = 0; tileCol < 33; tileCol++) {
-            
-            uint8_t adjCol = ((tileCol + coarseX) % 32);
-            uint8_t adjRow = ((tileRow + coarseY) % 32);
-
-            uint16_t nametablePos = nametableOffset;
-            nametablePos += (((tileCol + coarseX) / 32) * 0x0400);
-            
-            // cycle 2-3
-            uint8_t nametableByte = vidRAM[nametablePos + adjCol + (adjRow * 32)];
-
-            // cycle 3-4
-            uint8_t attributeByte = vidRAM[nametablePos + 0x03C0 + (adjCol / 4) + ((adjRow / 4) * 8)];
-            if ((adjCol / 2) % 2 == 1) {
-                attributeByte >>= 2;
-            }
-            if ((adjRow / 2) % 2 == 1) {
-                attributeByte >>= 4;
-            }
-            attributeByte &= 0b00000011;
-
-            uint8_t* tile = chrCache[bankOffset + nametableByte];
-            for (int pixCol = 0; pixCol < 8; pixCol++) {
-              uint8_t colorID = tile[((y % 8) * 8) + (7 - pixCol)];
-              if (colorID == 0) {
-                ppu_setPixel(ppu_colors[paletteRAM[0]], (tileCol * 8) + pixCol - fineX, y - fineY);
-              } else {
-                ppu_setPixel(ppu_colors[paletteRAM[(attributeByte << 2) + colorID]], (tileCol * 8) + pixCol - fineX, y - fineY);
-              }
-            }
-        }
+    uint8_t* tile = chrCache[bankOffset + nametableByte];
+    for (int pixCol = 0; pixCol < 8; pixCol++) {
+      uint8_t colorID = tile[((y % 8) * 8) + (7 - pixCol)];
+      if (showBackground) ppu_setPixel(colors[paletteRAM[colorID ? ((attributeByte << 2) + colorID) : 0]], (tileCol * 8) + pixCol - fineX, y - fineY);
     }
+  }
 
-    // this is too nested for my liking
-    if (ppu_getMaskFlag(PPUMASK_SHOWSPRIT)) {
-        for (int i = 0; i < 256; i += 4) {
-            
-            if (oamRAM[i] > y - 8 && oamRAM[i] <= y) {
-                uint8_t relY = y - oamRAM[i]; 
-                bool flipHorizontally = (oamRAM[i + 2] >> 6) & 1;
-                bool flipVertically = (oamRAM[i + 2] >> 7) & 1;
-                bool isBehindBackground = (oamRAM[i + 2] >> 5) & 1;
-                if (flipVertically) relY = 7 - relY;
-                uint8_t paletteID = (oamRAM[i + 2]) & 0b00000011;
-                uint8_t* tile = chrCache[spriteBankOffset + oamRAM[i + 1]];
-                for (int pixCol = 7; pixCol >= 0; pixCol--) {
-                    uint8_t colorID = tile[(relY * 8) + (7 - pixCol)];
-                    if (colorID != 0) {
-                        uint8_t relX = oamRAM[i + 3] + ((flipHorizontally) ? 7 - pixCol : pixCol);
-                        
-                        if (backgroundPixels[relX] == 0 || !isBehindBackground) {
-                            ppu_setPixel(ppu_colors[paletteRAM[((paletteID + 4) << 2) + colorID]], relX, y);
-                        }
+  // draw sprites from OAM
+  for (int i = 0; i < 256; i += 4) {
+    // skip this sprite if not present in scanline
+    if (!(oamRAM[i] > y - 8 && oamRAM[i] <= y)) continue;
 
-                        if (containsSpriteZero && i == 0) {
-                            triggerSpriteZero = true;
-                        } // bracket 6 of 6
-                    } // bracket 5 of 6
-                } // bracket 4 of 6
-            } // bracket 3 of 6
-        } // bracket 2 of 6
-    } // bracket 1 of 6
+    // parse sprite data
+    uint8_t relY = y - oamRAM[i]; 
+    bool flipHorizontally = (oamRAM[i + 2] >> 6) & 1;
+    bool flipVertically = (oamRAM[i + 2] >> 7) & 1;
+    bool isBehindBackground = (oamRAM[i + 2] >> 5) & 1;
+    if (flipVertically) relY = 7 - relY;
+    uint8_t paletteID = (oamRAM[i + 2]) & 0b00000011;
+    uint8_t* tile = chrCache[spriteBankOffset + oamRAM[i + 1]];
 
+    // only draw sprite if visible and within visible bounds
+    for (int pixCol = 7; pixCol >= 0; pixCol--) {
+      uint8_t colorID = tile[(relY * 8) + (7 - pixCol)];
+      if (colorID == 0) continue; // skip drawing this pixel if transparent
+      uint8_t relX = oamRAM[i + 3] + ((flipHorizontally) ? 7 - pixCol : pixCol);
+
+      // only draw if sprite is in foreground (or if background is clear)
+      if (bitmap[(y * 256) + relX] == colors[paletteRAM[0]] || !isBehindBackground) ppu_setPixel(colors[paletteRAM[((paletteID + 4) << 2) + colorID]], relX, y);
+      
+      // encountered sprite zero hit; trigger it at next scanline
+      if (containsSpriteZero && i == 0) triggerSpriteZero = true;
+    }
+  }
 }
 
 void ppu_drawRAMPalette() {
@@ -360,7 +365,7 @@ void ppu_drawRAMPalette() {
         uint16_t x = ((i % 16) + ((i % 16) / 4)) + 1;
         uint16_t y = (i / 16) * 2;
         uint16_t location = (y * 256 * 8) + (x * 8);
-        uint32_t color = ppu_colors[ppu_readMem(0x3F00 + i)];
+        uint32_t color = colors[ppu_readMem(0x3F00 + i)];
         for (int j = 0; j < 64; j++) {
             location += 1;
             if (j % 8 == 0) {
@@ -371,51 +376,40 @@ void ppu_drawRAMPalette() {
     }
 }
 
-/*
-// Obsolete - will remain for reference on how to calculate color
-static inline uint32_t ppu_getColor(uint8_t palette, uint8_t colorID) {
-    return ppu_colors[paletteRAM[(palette << 2) + colorID]];
-}
-*/
-
-uint32_t* ppu_getDisplayBitmap() {
-    return bitmap;
-}
-
 void ppu_setStatusFlag(enum PPUStatusFlag flag, bool enable) {
-    if (enable) {
-        ppureg.ppuStatus |= flag;
-    } else {
-        ppureg.ppuStatus &= ~flag;
-    }
+  if (enable) {
+    ppureg.ppuStatus |= flag;
+  } else {
+    ppureg.ppuStatus &= ~flag;
+  }
 }
 
 bool ppu_getStatusFlag(enum PPUStatusFlag flag) {
-    return (ppureg.ppuStatus & flag) > 0;
+  return (ppureg.ppuStatus & flag) > 0;
 }
 
 void ppu_setMaskFlag(enum PPUMaskFlag flag, bool enable) {
-    if (enable) {
-        ppureg.mask |= flag;
-    } else {
-        ppureg.mask &= ~flag;
-    }
+  if (enable) {
+    ppureg.mask |= flag;
+  } else {
+    ppureg.mask &= ~flag;
+  }
 }
 
 bool ppu_getMaskFlag(enum PPUMaskFlag flag) {
-    return (ppureg.mask & flag) > 0;
+  return (ppureg.mask & flag) > 0;
 }
 
 void ppu_setControlFlag(enum PPUControlFlag flag, bool enable) {
-    if (enable) {
-        ppureg.control |= flag;
-    } else {
-        ppureg.control &= ~flag;
-    }
+  if (enable) {
+    ppureg.control |= flag;
+  } else {
+    ppureg.control &= ~flag;
+  }
 }
 
 bool ppu_getControlFlag(enum PPUControlFlag flag) {
-    return (ppureg.control & flag) > 0;
+  return (ppureg.control & flag) > 0;
 }
 
 uint8_t ppu_getRegister(PPURegisterType r) {
