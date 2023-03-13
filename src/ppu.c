@@ -322,7 +322,7 @@ static force_inline void ppu_drawScanline(uint8_t y) {
     if ((adjRow / 2) % 2 == 1) {
         attributeByte >>= 4;
     }
-    attributeByte &= 0b00000011;
+    attributeByte &= BIT_FILL_2;
 
     uint8_t* tile = chrCache[bankOffset + nametableByte];
     for (int pixCol = 0; pixCol < 8; pixCol++) {
@@ -342,7 +342,7 @@ static force_inline void ppu_drawScanline(uint8_t y) {
     bool flipVertically = (oamRAM[i + 2] >> 7) & 1;
     bool isBehindBackground = (oamRAM[i + 2] >> 5) & 1;
     if (flipVertically) relY = 7 - relY;
-    uint8_t paletteID = (oamRAM[i + 2]) & 0b00000011;
+    uint8_t paletteID = (oamRAM[i + 2]) & BIT_FILL_2;
     uint8_t* tile = chrCache[spriteBankOffset + oamRAM[i + 1]];
 
     // only draw sprite if visible and within visible bounds
@@ -494,7 +494,7 @@ static force_inline uint8_t ppu_readMem(uint16_t address) {
   } else if (address < 0x3F00) { // vram
     return vidRAM[address & 0x1FFF];
   } else if (address < 0x4000) {
-    address &= 0b0011111;
+    address &= 0x1F;
     if (address == 0x0010 || address == 0x0014 || address == 0x0018 || address == 0x001C) {
       address -= 0x0010;
     }
@@ -539,7 +539,7 @@ static force_inline void ppu_writeMem(uint16_t address, uint8_t data) {
     vidRAM[primaryAddr + 0x1000] = data;
     vidRAM[secondaryAddr + 0x1000] = data;
   } else if (address < 0x4000) {
-    address &= 0b00011111;
+    address &= 0x1F;
     if (address == 0x0010 || address == 0x0014 || address == 0x0018 || address == 0x001C) {
       address -= 0x0010;
     }

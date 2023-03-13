@@ -33,15 +33,15 @@
 #include <stdint.h>
 
 typedef enum {
-    JP_RIGHT   = 0b10000000,
-    JP_LEFT    = 0b01000000,
-    JP_DOWN    = 0b00100000,
-    JP_UP      = 0b00010000,
-    JP_START   = 0b00001000,
-    JP_SELECT  = 0b00000100,
-    JP_BTN_B   = 0b00000010,
-    JP_BTN_A   = 0b00000001,
-    JP_NULL    = 0b00000000
+    JP_RIGHT   = 0x80,
+    JP_LEFT    = 0x40,
+    JP_DOWN    = 0x20,
+    JP_UP      = 0x10,
+    JP_START   = 0x08,
+    JP_SELECT  = 0x04,
+    JP_BTN_B   = 0x02,
+    JP_BTN_A   = 0x01,
+    JP_NULL    = 0x00
 } JoypadButton;
 
 /**

@@ -29,7 +29,7 @@
 /**
  * @brief Record & display perfomance metrics.
  */
-#define PERFORMANCE_DEBUG FALSE
+#define PERFORMANCE_DEBUG TRUE
 
 /**
  * @brief Run in headless mode (PPU will not render)
@@ -94,7 +94,7 @@
 #define PPU_SCANLINE_CYCLES 341
 
 // manually define background bank for debug nametable
-#define DBG_BKG_BANK 0
+#define DBG_BKG_BANK 1
 
 #define BIT_FILL_0 0x0
 #define BIT_FILL_1 0x1
