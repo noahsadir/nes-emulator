@@ -1,6 +1,6 @@
 # NES Emulator
 
-![Screenshot of Emulator](https://github.com/noahsadir/nes-emulator/raw/masteremu-demo.png)
+![Screenshot of Emulator](https://raw.githubusercontent.com/noahsadir/nes-emulator/master/emu-demo.png)
 
 A **very** basic NES Emulator written entirely in C, with portability in mind.
 
