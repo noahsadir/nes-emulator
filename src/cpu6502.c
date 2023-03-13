@@ -646,7 +646,7 @@ static force_inline void cpu6502_parseOpcode(uint8_t opcode, Bytecode* b) {
       b->count = 2;
       break;
     }
-    case 0xB6: case 0x96: case 0x97:
+    case 0xB6: case 0x96: case 0x97: case 0xB7:
     {
       b->addressingMode = AM_ZP_Y;
       b->count = 2;
@@ -1265,6 +1265,348 @@ static force_inline uint8_t cpu6502_execute(Bytecode* b) {
       break;
     }
     // illegal instructions
+    case I_ILL_ALR: // AND + LSR
+    {
+      // AND
+      reg.a = memRead(val) & reg.a;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.a == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.a & BIT_MASK_8) != 0);
+
+      // LSR
+      uint8_t storedVal = reg.a;
+      if (!(b->addressingMode == AM_ACCUMULATOR)) {
+        storedVal = memRead(val);
+      }
+
+      cpu6502_setFlag(CPUSTAT_CARRY, storedVal & 1);
+      storedVal = storedVal >> 1;
+
+      cpu6502_setFlag(CPUSTAT_ZERO, storedVal == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (storedVal & BIT_MASK_8) != 0);
+
+      if (b->addressingMode == AM_ACCUMULATOR) {
+        reg.a = storedVal;
+      } else {
+        memWrite(val, storedVal);
+      }
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_ANC: // AND + (C<-ASL)
+    {
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_ANC2: // AND + (C<-ROL)
+    {
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_ANE: // (* AND X) + AND
+    {
+      reg.a = (rand() % 0xFF) & reg.x;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.a == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.a & BIT_MASK_8) != 0);
+
+      reg.a = memRead(val) & reg.a;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.a == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.a & BIT_MASK_8) != 0);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_ARR: // AND + ROR
+    {
+      // AND
+      reg.a = memRead(val) & reg.a;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.a == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.a & BIT_MASK_8) != 0);
+      
+      // ROR
+      uint8_t storedVal = reg.a;
+      if (!(b->addressingMode == AM_ACCUMULATOR)) {
+        storedVal = memRead(val);
+      }
+
+      bool oldCarry = ((reg.p & CPUSTAT_CARRY) > 0);
+      cpu6502_setFlag(CPUSTAT_CARRY, storedVal & 1);
+      storedVal = storedVal >> 1;
+      storedVal = storedVal | (oldCarry << 7);
+
+      cpu6502_setFlag(CPUSTAT_ZERO, storedVal == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (storedVal & BIT_MASK_8) != 0);
+
+      if (b->addressingMode == AM_ACCUMULATOR) {
+        reg.a = storedVal;
+      } else {
+        memWrite(val, storedVal);
+      }
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_DCP: // DEC + CMP
+    {
+      // DEC
+      uint8_t decval = memRead(val) - 1;
+      memWrite(val, decval);
+      cpu6502_setFlag(CPUSTAT_ZERO, decval == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (decval & BIT_MASK_8) != 0);
+      
+      // CMP
+      uint8_t memVal = memRead(val);
+
+      int8_t signedResult = ((int8_t) reg.a) - ((int8_t) memVal);
+      if (reg.a < memVal) {
+        cpu6502_setFlag(CPUSTAT_ZERO, 0);
+        cpu6502_setFlag(CPUSTAT_CARRY, 0);
+      } else if (reg.a == memVal) {
+        cpu6502_setFlag(CPUSTAT_ZERO, 1);
+        cpu6502_setFlag(CPUSTAT_CARRY, 1);
+      } else if (reg.a > memVal) {
+        cpu6502_setFlag(CPUSTAT_ZERO, 0);
+        cpu6502_setFlag(CPUSTAT_CARRY, 1);
+      }
+
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, signedResult < 0);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_ISC:
+    {
+      // INC
+      uint8_t incval = memRead(val) + 1;
+      memWrite(val, incval);
+      cpu6502_setFlag(CPUSTAT_ZERO, incval == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (incval & BIT_MASK_8) != 0);
+      
+      // SBC
+      uint8_t memoryVal = ~memRead(val);
+      uint16_t sum = reg.a + memoryVal + ((uint16_t)((reg.p & CPUSTAT_CARRY) > 0));
+      cpu6502_setFlag(CPUSTAT_CARRY, sum > 0xFF);
+      cpu6502_setFlag(CPUSTAT_OVERFLOW, (reg.a ^ sum) & (memoryVal ^ sum) & 0x80);
+      reg.a = (uint8_t) sum;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.a == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.a & BIT_MASK_8) != 0);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_LAS:
+    {
+      // LDA
+      reg.a = memRead(val);
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.a == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.a & BIT_MASK_8) != 0);
+      
+      // TSX
+      reg.x = reg.s;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.x == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.x & BIT_MASK_8) != 0);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_LAX:
+    {
+      // LDA
+      reg.a = memRead(val);
+      reg.x = reg.a;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.x == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.x & BIT_MASK_8) != 0);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_LXA:
+    {
+      // (magic) AND
+      uint8_t calcVal = (rand() % 0xFF) & reg.a;
+      reg.a = calcVal;
+      reg.x = calcVal;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.a == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.a & BIT_MASK_8) != 0);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_RLA:
+    {
+      // ROL
+      uint8_t storedVal = reg.a;
+      if (!(b->addressingMode == AM_ACCUMULATOR)) {
+        storedVal = memRead(val);
+      }
+
+      bool oldCarry = ((reg.p & CPUSTAT_CARRY) > 0);
+      cpu6502_setFlag(CPUSTAT_CARRY, (storedVal >> 7) & 1);
+      storedVal = storedVal << 1;
+      storedVal = storedVal | oldCarry;
+
+      cpu6502_setFlag(CPUSTAT_ZERO, storedVal == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (storedVal & BIT_MASK_8) != 0);
+
+      if (b->addressingMode == AM_ACCUMULATOR) {
+        reg.a = storedVal;
+      } else {
+        memWrite(val, storedVal);
+      }
+      
+      // AND
+      reg.a = memRead(val) & reg.a;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.a == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.a & BIT_MASK_8) != 0);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_RRA:
+    {
+      uint8_t storedVal = reg.a;
+      if (!(b->addressingMode == AM_ACCUMULATOR)) {
+        storedVal = memRead(val);
+      }
+
+      bool oldCarry = ((reg.p & CPUSTAT_CARRY) > 0);
+      cpu6502_setFlag(CPUSTAT_CARRY, storedVal & 1);
+      storedVal = storedVal >> 1;
+      storedVal = storedVal | (oldCarry << 7);
+
+      cpu6502_setFlag(CPUSTAT_ZERO, storedVal == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (storedVal & BIT_MASK_8) != 0);
+
+      if (b->addressingMode == AM_ACCUMULATOR) {
+        reg.a = storedVal;
+      } else {
+        memWrite(val, storedVal);
+      }
+
+      uint8_t memoryVal = memRead(val);
+      uint16_t sum = reg.a + memoryVal + ((uint16_t)((reg.p & CPUSTAT_CARRY) > 0));
+      cpu6502_setFlag(CPUSTAT_CARRY, sum > 0xFF);
+      cpu6502_setFlag(CPUSTAT_OVERFLOW, (reg.a ^ sum) & (memoryVal ^ sum) & 0x80);
+      reg.a = (uint8_t) sum;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.a == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.a & BIT_MASK_8) != 0);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_SAX:
+    {
+      memWrite(val, reg.a & reg.x);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_SBX:
+    {
+      // CMP
+      reg.x -= 1;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.x == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.x & BIT_MASK_8) != 0);
+      
+      // DEX
+      reg.x -= 1;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.x == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.x & BIT_MASK_8) != 0);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_SHA:
+    {
+      memWrite(val, reg.a & reg.x & (uint8_t)(((val & 0xF0) >> 0x0F) + 1));
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_SHX:
+    {
+      memWrite(val, reg.x & (uint8_t)(((val & 0xF0) >> 0x0F) + 1));
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_SHY:
+    {
+      memWrite(val, reg.y & (uint8_t)(((val & 0xF0) >> 0x0F) + 1));
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_SLO:
+    {
+      // SLO
+      uint8_t storedVal = reg.a;
+      if (!(b->addressingMode == AM_ACCUMULATOR)) {
+        storedVal = memRead(val);
+      }
+
+      cpu6502_setFlag(CPUSTAT_CARRY, (storedVal >> 7) & 1);
+      storedVal = storedVal << 1;
+
+      cpu6502_setFlag(CPUSTAT_ZERO, storedVal == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (storedVal & BIT_MASK_8) != 0);
+
+      if (b->addressingMode == AM_ACCUMULATOR) {
+        reg.a = storedVal;
+      } else {
+        memWrite(val, storedVal);
+      }
+      
+      // ORA
+      reg.a = memRead(val) | reg.a;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.a == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.a & BIT_MASK_8) != 0);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_SRE:
+    {
+      // LSR
+      uint8_t storedVal = reg.a;
+      if (!(b->addressingMode == AM_ACCUMULATOR)) {
+        storedVal = memRead(val);
+      }
+
+      cpu6502_setFlag(CPUSTAT_CARRY, storedVal & 1);
+      storedVal = storedVal >> 1;
+
+      cpu6502_setFlag(CPUSTAT_ZERO, storedVal == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (storedVal & BIT_MASK_8) != 0);
+
+      if (b->addressingMode == AM_ACCUMULATOR) {
+        reg.a = storedVal;
+      } else {
+        memWrite(val, storedVal);
+      }
+
+      // EOR
+      reg.a = memRead(val) ^ reg.a;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.a == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.a & BIT_MASK_8) != 0);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_TAS:
+    {
+      reg.s = reg.a & reg.x;
+      memWrite(val, reg.a & reg.x & (uint8_t)(((val & 0xF0) >> 0x0F) + 1));
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_USBC:
+    {
+      uint8_t memoryVal = ~memRead(val);
+      uint16_t sum = reg.a + memoryVal + ((uint16_t)((reg.p & CPUSTAT_CARRY) > 0));
+      cpu6502_setFlag(CPUSTAT_CARRY, sum > 0xFF);
+      cpu6502_setFlag(CPUSTAT_OVERFLOW, (reg.a ^ sum) & (memoryVal ^ sum) & 0x80);
+      reg.a = (uint8_t) sum;
+      cpu6502_setFlag(CPUSTAT_ZERO, reg.a == 0);
+      cpu6502_setFlag(CPUSTAT_NEGATIVE, (reg.a & BIT_MASK_8) != 0);
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_NOP:
+    {
+      reg.pc += b->count;
+      break;
+    }
+    case I_ILL_JAM:
+    {
+      cpuerrno = 1;
+      clockMode = CPUCLOCK_HALT;
+      reg.pc += b->count;
+      break;
+    }
     default:
     {
       cpuerrno = 1;
