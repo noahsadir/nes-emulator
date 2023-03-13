@@ -25,12 +25,11 @@
 #include "bus.h"
 
 uint8_t cpuRAM[2048];
-uint8_t vidRAM[0x2000];
-uint8_t paletteRAM[32];
 uint8_t* prgRAM = NULL;
 
 INES cartridge;
 char trace[150];
+char debugOverlayString[32];
 
 bool cpuPaused = false;
 bool audioEnabled = false;
@@ -42,16 +41,26 @@ int32_t cyclesUntilSample = 0;
 int32_t cyclesUntilSecond = 0;
 uint64_t frameIntervalCount = 0;
 uint32_t cpuTimeCount = 0;
+uint32_t ppuCycleDebt = 0;
+uint32_t cyclesPerSec = 0;
 
 #if (PERFORMANCE_DEBUG)
+uint32_t framesElapsed = 0;
+uint32_t framesPerSec = 0;
 double usecsElapsed = 0;
-uint32_t cyclesPerSec = 0;
+
+uint32_t freqHertz;
+uint32_t framerate;
 struct timeval t1, t2;
+struct timeval pt1, pt2;
+struct timeval pd1, pd2;
 #endif
 
 void bus_init(FileBinary* bin) {
+  debugOverlayString[0] = '\0';
   #if (PERFORMANCE_DEBUG)
   gettimeofday(&t1, NULL);
+  gettimeofday(&pd1, NULL);
   #endif
 
   io_init(DISPLAY_SCALE);
@@ -75,9 +84,12 @@ void bus_init(FileBinary* bin) {
   CPUEmulationMode mode = EMU_MODE; // perhaps this could be set dynamically?
 
   // initialize hardware
-  ppu_init(vidRAM, cartridge.chrRom);
+  ppu_init(cartridge.chrRom, cartridge.header.mirroringType == MIRRORING_VERTICAL, &bus_readCPU, &bus_ppuReport);
   cpu6502_init(&bus_writeCPU, &bus_readCPU, mode);
-  //bus_initClock();
+
+  #if (LIMIT_CLOCK_SPEED)
+  bus_initClock();
+  #endif
 
   // determine if emulator should run in disassembly mode or not
   if (mode == CPUEMU_DISASSEMBLE) {
@@ -93,7 +105,7 @@ void bus_init(FileBinary* bin) {
   {
     case 0: io_panic("(CPU) 0x00 UNEXPECTED_HALT"); break;
     case 1: io_panic("(CPU) 0x01 ILLEGAL_INSTR"); break;
-    default: io_panic("(CPU) 0x?? UNKNOWN"); break;
+    default: io_panic("(CPU) 0xFF UNKNOWN"); break;
   }
   cpu6502_setClockMode(CPUCLOCK_HALT);
   while (true) io_pollJoypad(&bus_handleInput); // wait for user to exit, essentially
@@ -299,66 +311,6 @@ uint8_t bus_cartridgeRead(uint16_t addr) {
   return 0;
 }
 
-uint8_t bus_readPPU(uint16_t address) {
-  address = address & 0x3FFF;
-  if (address < 0x2000) { // chr rom
-    return cartridge.chrRom[address];
-  } else if (address < 0x3F00) { // vram
-    return vidRAM[address & 0x1FFF];
-  } else if (address < 0x4000) {
-    address &= 0b0011111;
-    if (address == 0x0010 || address == 0x0014 || address == 0x0018 || address == 0x001C) {
-      address -= 0x0010;
-    }
-    return paletteRAM[address];
-  }
-  return 0x00;
-}
-
-void bus_writePPU(uint16_t address, uint8_t data) {
-  address = address & 0x3FFF;
-  if (address < 0x2000) { // chr rom
-    // read only -- invalid operation
-  } else if (address < 0x3F00) {
-    // I'm sure this incredibly convoluted mirroring makes more sense in
-    // the real hardware implementation. But boy is this a mess in software!
-
-    // NOTE: VRAM addresses 0x2000-0x3FFF, but for simplicity we'll subtract 0x2000
-    //       and flatten 0x3000-0x3FFF onto 0x2000-0x2FFF
-    uint16_t primaryAddr = address & 0x0FFF;
-    uint16_t secondaryAddr = primaryAddr;
-
-    // Per https://www.nesdev.org/wiki/PPU_nametables,
-    // Vertical mirroring: $2000 equals $2800 and $2400 equals $2C00 (e.g. Super Mario Bros.)
-    // Horizontal mirroring: $2000 equals $2400 and $2800 equals $2C00 (e.g. Kid Icarus)
-    if (cartridge.header.mirroringType == MIRRORING_VERTICAL) {
-      if ((primaryAddr / 0x400) & 3) { // (if quadrant >= 2)
-        secondaryAddr = primaryAddr - 0x0800;
-      } else {
-        secondaryAddr = primaryAddr + 0x0800;
-      }
-    } else {
-      if ((primaryAddr / 0x400) & 1) { // (if quadrant is odd)
-        secondaryAddr = primaryAddr - 0x0400;
-      } else {
-        secondaryAddr = primaryAddr + 0x0400;
-      }
-    }
-    // Data is mirrored to 4 addresses on VRAM
-    vidRAM[primaryAddr] = data;
-    vidRAM[secondaryAddr] = data;
-    // 0x2000-0x2FFF mirrors 0x3000-0x3FFF
-    vidRAM[primaryAddr + 0x1000] = data;
-    vidRAM[secondaryAddr + 0x1000] = data;
-  } else if (address < 0x4000) {
-    address &= 0b00011111;
-    if (address == 0x0010 || address == 0x0014 || address == 0x0018 || address == 0x001C) {
-      address -= 0x0010;
-    }
-    paletteRAM[address] = data;
-  }
-}
-
 void bus_setJoypad(JoypadButton button) {
     joypad_setButton(button);
 }
@@ -389,19 +341,22 @@ void bus_initClock() {
     }
   }
 
-  io_panic("(BUS) 0x00 CPU_HALT");
+  io_panic("(CPU) 0x00 UNEXPECTED_HALT");
   while (true) io_pollJoypad(&bus_handleInput);
 }
 
 void bus_initPPU() {
     #if (!HEADLESS)
-    ppu_init(vidRAM, cartridge.chrRom);
+    ppu_init(cartridge.chrRom, cartridge.header.mirroringType == MIRRORING_VERTICAL, &bus_readCPU, &bus_ppuReport);
     #endif
 }
 
 void bus_cpuReport(uint8_t cycleCount) {
+  cyclesPerSec += cycleCount;
   // update PPU
   #if (!HEADLESS)
+  ppuCycleDebt += cycleCount;
+  // let PPU catch up either immediately or once per frame
   // run 3x the number of cycles on the PPU
   ppu_runCycles(cycleCount * 3);
 
@@ -411,6 +366,7 @@ void bus_cpuReport(uint8_t cycleCount) {
     bus_triggerNMI();
     ppu_setStatusFlag(PPUSTAT_VBLKSTART, false);
   }
+  
   #endif
 
   // update cycle counters
@@ -421,7 +377,7 @@ void bus_cpuReport(uint8_t cycleCount) {
   // pause CPU until next frame interval
   if (cyclesUntilDelay <= 0) {
       if (syncMode != SYNC_DISABLED) cpuPaused = true;
-      cyclesUntilDelay += CPU_FRAME_CLOCKS;
+      cyclesUntilDelay += CPU_FRAME_CYCLES;
   }
 
   // CPU second has elapsed (CPU second = 1789773 clocks)
@@ -447,10 +403,45 @@ void bus_frameIntervalReport() {
 }
 
 void bus_ppuReport() {
-    #if (!HEADLESS)
-    io_update();
-    #endif
-    io_pollJoypad(&bus_handleInput);
+  // If desired, alculate & display framerate and CPU frequency
+  #if (PERFORMANCE_DEBUG)
+  gettimeofday(&pd2, NULL); // poll delay
+  uint32_t delayCounter = (pd2.tv_sec - pd1.tv_sec);
+  framesElapsed += 1;
+  if (delayCounter >= 1) {
+    freqHertz = cyclesPerSec;
+    framerate = framesElapsed;
+    framesElapsed = 0;
+    cyclesPerSec = 0;
+    gettimeofday(&pd1, NULL);
+    uint32_t fq = freqHertz;
+    uint32_t fr = framerate;
+    // This is ugly, but it reduces dependency & overhead from sprintf
+    for (int i = 8; i >= 0; i--) {
+      if (i < 3) {
+        debugOverlayString[i] = '0' + (fq % 10);
+      } else if (i < 6) {
+        debugOverlayString[i + 1] = '0' + (fq % 10);
+        debugOverlayString[i] = '.';
+      }
+      fq /= 10;
+    }
+    debugOverlayString[7] = '\0';
+    strcat(debugOverlayString, " MHz (");
+    for (int i = 16; i >= 13; i--) {
+      debugOverlayString[i] = '0' + (fr % 10);
+      fr /= 10;
+    }
+    debugOverlayString[17] = '\0';
+    strcat(debugOverlayString, " FPS)");
+  }
+  #endif
+
+  #if (!HEADLESS)
+  io_update(debugOverlayString);
+  #endif
+
+  io_pollJoypad(&bus_handleInput);
 }
 
 void bus_handleInput(NESInput input, bool enabled) {
@@ -468,7 +459,7 @@ void bus_triggerNMI() {
 }
 
 void bus_triggerCPUPanic() {
-    io_panic("(BUS) 0x01 TRIGGER_PANIC");
+    io_panic("(SYS) 0x00 TRIGGER_PANIC");
     while (true) io_pollJoypad(&bus_handleInput);
 }
 

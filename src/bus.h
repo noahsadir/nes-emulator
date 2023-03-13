@@ -146,22 +146,6 @@ uint16_t bus_readCPUAddr(uint16_t address);
 void bus_writeCPUAddr(uint16_t address, uint16_t data);
 
 /**
- * @brief Perform read operation at mapped address
- * 
- * @param address the address to read
- * @return uint8_t the data from the specified address
- */
-uint8_t bus_readPPU(uint16_t address);
-
-/**
- * @brief Perform write operation at mapped address
- * 
- * @param address the address to write to
- * @param data the data to write
- */
-void bus_writePPU(uint16_t address, uint8_t data);
-
-/**
  * @brief Set a button on the joypad
  * 
  * @param button the button to set

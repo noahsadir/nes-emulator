@@ -4,6 +4,8 @@
 #define TRUE 1
 #define FALSE 0
 
+#define force_inline __attribute__((always_inline)) inline
+
 /**
  * @brief Platform value
  *
@@ -14,16 +16,59 @@
  */
 #define PLATFORM 0
 
+/**
+ * @brief Toggle verbose exceptions.
+ */
 #define VERBOSE_EXC FALSE
 
+/**
+ * @brief Generate CPU trace.
+ */
 #define LOGGING FALSE
 
-#define PERFORMANCE_DEBUG TRUE
+/**
+ * @brief Record & display perfomance metrics.
+ */
+#define PERFORMANCE_DEBUG FALSE
 
+/**
+ * @brief Run in headless mode (PPU will not render)
+ */
 #define HEADLESS FALSE
 
+/**
+ * @brief Minimum number of microseconds which must occur
+ *        before the display is re-rendered.
+ *        NOTE: PPU will continue to render scanlines
+ */
+#define MIN_DRAW_INTERVAL 16667
+
+/**
+ * @brief Limit clock speed to original NES (1.789773 MHz)
+ */
+#define LIMIT_CLOCK_SPEED TRUE
+
+/**
+ * @brief Set the display scale.
+ */
 #define DISPLAY_SCALE 2
 
+/**
+ * @brief Allow PPU to catch up with CPU after every instruction.
+ *        Otherwise, if faslse, catch up every frame
+ *        NOTE: This also affects PPU-will operate at scanline-level granularity
+ *              if enabled, or just frame-level granularity if not
+ */
+#define PPU_IMMEDIATE_CATCHUP TRUE
+
+/**
+ * @brief Determine how the CPU should handle programs
+ *        CPUEMU_INTERPRET_DIRECT - Decode instruction every time 
+ *                                  it is encountered.
+ *        CPUEMU_INTERPRET_CACHED - Store encountered instructions as
+ *                                  bytecode for quicker decoding.
+ *       
+ */
 #define EMU_MODE CPUEMU_INTERPRET_CACHED
 
 // magic numbers
@@ -34,13 +79,22 @@
 
 #define DISPLAY_BITMAP_SIZE (DISPLAY_WIDTH * DISPLAY_HEIGHT)
 
+#define DISPLAY_PIXEL_SIZE ((DISPLAY_WIDTH * DISPLAY_SCALE) * (DISPLAY_HEIGHT * DISPLAY_SCALE))
+
 #define DISPLAY_FRAMERATE 60
 
 #define DISPLAY_FRAME_USEC 16667
 
 #define CPU_FREQUENCY 1789773
 
-#define CPU_FRAME_CLOCKS 29780
+#define CPU_FRAME_CYCLES 29780
+
+#define PPU_FRAME_CYCLES 89340
+
+#define PPU_SCANLINE_CYCLES 341
+
+// manually define background bank for debug nametable
+#define DBG_BKG_BANK 0
 
 #define BIT_FILL_0 0x0
 #define BIT_FILL_1 0x1
@@ -221,8 +275,6 @@ typedef struct {
   uint8_t p;
 } CPURegisters;
 
-extern uint32_t bitmap[DISPLAY_BITMAP_SIZE];
-
 static const uint32_t colors[64] =
 {
 0x757575, 0x271B8F, 0x0000AB, 0x47009F, 0x8F0077, 0xAB0013, 0xA70000, 0x7F0B00,
@@ -234,5 +286,30 @@ static const uint32_t colors[64] =
 0xFFFFFF, 0xABE7FF, 0xC7D7FF, 0xD7CBFF, 0xFFC7FF, 0xFFC7DB, 0xFFBFB3, 0xFFDBAB,
 0xFFE7A3, 0xE3FFA3, 0xABF3BF, 0xB3FFCF, 0x9FFFF3, 0x000000, 0x000000, 0x000000
 };
+
+// Taken from NES Rust Tutorial (see readme:references)
+static const uint32_t colors2[64] = {
+  0x808080, 0x003DA6, 0x0012B0, 0x440096, 0xA1005E,
+  0xC70028, 0xBA0600, 0x8C1700, 0x5C2F00, 0x104500,
+  0x054A00, 0x00472E, 0x004166, 0x000000, 0x050505,
+  0x050505, 0xC7C7C7, 0x0077FF, 0x2155FF, 0x8237FA,
+  0xEB2FB5, 0xFF2950, 0xFF2200, 0xD63200, 0xC46200,
+  0x358000, 0x058F00, 0x008A55, 0x0099CC, 0x212121,
+  0x090909, 0x090909, 0xFFFFFF, 0x0FD7FF, 0x69A2FF,
+  0xD480FF, 0xFF45F3, 0xFF618B, 0xFF8833, 0xFF9C12,
+  0xFABC20, 0x9FE30E, 0x2BF035, 0x0CF0A4, 0x05FBFF,
+  0x5E5E5E, 0x0D0D0D, 0x0D0D0D, 0xFFFFFF, 0xA6FCFF,
+  0xB3ECFF, 0xDAABEB, 0xFFA8F9, 0xFFABB3, 0xFFD2B0,
+  0xFFEFA6, 0xFFF79C, 0xD7E895, 0xA6EDAF, 0xA2F2DA,
+  0x99FFFC, 0xDDDDDD, 0x111111, 0x111111
+};
+
+
+extern uint32_t bitmap[DISPLAY_BITMAP_SIZE];
+extern uint8_t oamRAM[0x00FF];
+extern uint8_t vidRAM[0x2000];
+extern uint8_t paletteRAM[32];
+extern uint8_t chrCache[512][64];
+extern uint32_t debugbmp[DISPLAY_PIXEL_SIZE];
 
 #endif
