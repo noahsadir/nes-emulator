@@ -98,6 +98,13 @@ void bus_initClock();
 /* DATA METHODS */
 
 /**
+ * @brief Generate a bytecode program
+ * 
+ * @param program the pointer to the bytecode program object
+ */
+void bus_generateBytecode(BytecodeProgram* program);
+
+/**
  * @brief Perform read operation at mapped address
  * 
  * @param address the address to read
@@ -179,9 +186,13 @@ void bus_cpuReport(uint8_t cycleCount);
  */
 void bus_ppuReport();
 
+/**
+ * @brief Handle result of joypad input
+ * 
+ * @param input the joypad input
+ * @param enabled the new state of the joypad input
+ */
 void bus_handleInput(NESInput input, bool enabled);
-
-void bus_cpuKillReport();
 
 /* TRIGGERS */
 

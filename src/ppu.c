@@ -70,7 +70,7 @@ void ppu_init(uint8_t* crom, bool vmirror, uint8_t(*r)(uint16_t), void(*c)(uint3
   ppureg.ppudata     = 0x00;
   ppureg.oamdma      = 0x00;
   ppu_generateChrCache();
-  for (int i = 0; i < 61440; i++) {
+  for (int i = 0; i < DISPLAY_BITMAP_SIZE; i++) {
     bitmap[i] = 0;
   }
 }
@@ -147,10 +147,6 @@ void ppu_runCycles(uint32_t cycleCount) {
   #endif
 }
 
-uint64_t ppu_getFrames() {
-  return ppuFrames;
-}
-
 static force_inline void ppu_setPixel(uint32_t color, int16_t x, int16_t y) {
   if (x >= 0 && x < 256 && y >= 0 && y < 240) bitmap[(y * 256) + x] = color;
 }
@@ -175,17 +171,6 @@ static force_inline void ppu_drawTile(bool flipHorizontally, bool flipVertically
         ppu_setPixel(colors[paletteRAM[(palette << 2) + color]], x + (flipHorizontally ? col : (7 - col)), y + (flipVertically ? (7 - row) : row));
       }
     }
-  }
-}
-
-void ppu_drawCHRROM(uint16_t bank) {
-  for (uint16_t y = 0; y < 16; y++) {
-    for (uint16_t x = 0; x < 16; x++) {
-      ppu_drawTile(false, false, false, false, false, (y * 16) + x + (bank * 128), 0, x * 8, y * 8);
-    }
-  }
-  if (bank == 0) {
-    ppu_drawCHRROM(1);
   }
 }
 
@@ -273,7 +258,7 @@ static force_inline void ppu_drawFrame() {
     bool flipVertically = (oamRAM[i + 2] >> 7) & 1;
     bool isBehindBackground = (oamRAM[i + 2] >> 5) & 1;
     uint8_t paletteID = (oamRAM[i + 2]) & BIT_FILL_2;
-    // only draw sprite if visible and within visible bounds
+    // only draw sprite if visible and within bounds
     if (relY < 0xEF && relY != 0x00 && showSprite) ppu_drawTile(flipHorizontally, flipVertically, true, isBehindBackground, false, spriteBankOffset + oamRAM[i + 1], paletteID + 4, relX, relY);
   }
 }
@@ -396,7 +381,7 @@ bool ppu_getControlFlag(enum PPUControlFlag flag) {
   return (ppureg.control & flag) > 0;
 }
 
-uint8_t ppu_getRegister(PPURegisterType r) {
+uint8_t ppu_readRegister(PPURegisterType r) {
   switch (r) {
     case PPU_CONTROL: return ppureg.control;
     case PPU_MASK: return ppureg.mask;
@@ -429,7 +414,7 @@ uint8_t ppu_getRegister(PPURegisterType r) {
   return 0;
 }
 
-void ppu_setRegister(PPURegisterType r, uint8_t data) {
+void ppu_writeRegister(PPURegisterType r, uint8_t data) {
   switch (r) {
     case PPU_CONTROL: {
       ppureg.control = data;
@@ -486,21 +471,6 @@ void ppu_setRegister(PPURegisterType r, uint8_t data) {
       break;
     }
   }
-}
-
-static force_inline uint8_t ppu_readMem(uint16_t address) {
-  if (address < 0x2000) { // chr rom
-    return chrROM[address & 0x3FFF];
-  } else if (address < 0x3F00) { // vram
-    return vidRAM[address & 0x1FFF];
-  } else if (address < 0x4000) {
-    address &= 0x1F;
-    if (address == 0x0010 || address == 0x0014 || address == 0x0018 || address == 0x001C) {
-      address -= 0x0010;
-    }
-    return paletteRAM[address];
-  }
-  return 0x00;
 }
 
 static force_inline void ppu_writeMem(uint16_t address, uint8_t data) {

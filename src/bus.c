@@ -43,6 +43,7 @@ uint64_t frameIntervalCount = 0;
 uint32_t cpuTimeCount = 0;
 uint32_t ppuCycleDebt = 0;
 uint32_t cyclesPerSec = 0;
+uint32_t totalCPUCycles = 0;
 
 #if (PERFORMANCE_DEBUG)
 uint32_t framesElapsed = 0;
@@ -76,10 +77,14 @@ void bus_init(FileBinary* bin) {
     while (true) io_pollJoypad(&bus_handleInput);
   }
 
-  #if (HEADLESS)
-  // looks like somebody chopped off the PPU!
-  io_printString("DISPLAY OFF", 88, 64);
-  #endif
+  if (HEADLESS) {
+    // looks like somebody chopped off the PPU!
+    io_printString("DISPLAY OFF", 88, 64);
+  }
+
+  if (LOGGING) {
+    logging_init();
+  }
 
   CPUEmulationMode mode = EMU_MODE; // perhaps this could be set dynamically?
 
@@ -88,16 +93,21 @@ void bus_init(FileBinary* bin) {
   cpu6502_init(&bus_writeCPU, &bus_readCPU, mode);
 
   #if (LIMIT_CLOCK_SPEED)
-  bus_initClock();
+  //bus_initClock();
   #endif
 
   // determine if emulator should run in disassembly mode or not
-  if (mode == CPUEMU_DISASSEMBLE) {
-    //cpu6502_dasm(cartridge.prgRom, rom.header.prgRomSize * 16384, &nes_handleDisassemblyLine, DASM_MINIMAL);
-  } else if (mode == CPUEMU_INTERPRET_DIRECT || mode == CPUEMU_INTERPRET_CACHED) {
+  if (mode == CPUEMU_INTERPRET_DIRECT || mode == CPUEMU_INTERPRET_CACHED) {
     while (cpu6502_getClockMode() != CPUCLOCK_HALT) {
       cpu6502_step(trace, &bus_cpuReport);
     }
+  } else if (mode == CPUEMU_RECOMPILE_STATIC) {
+    cpu6502_loadBytecodeProgram(cartridge.prgRom, (uint32_t)cartridge.header.prgRomSize * 16384);
+    while (cpu6502_getClockMode() != CPUCLOCK_HALT) {
+      cpu6502_step(NULL, &bus_cpuReport);
+    }
+  } else if (mode == CPUEMU_DISASSEMBLE) {
+    //cpu6502_dasm(cartridge.prgRom, rom.header.prgRomSize * 16384, &nes_handleDisassemblyLine, DASM_MINIMAL);
   }
 
   // CPU should never halt until shut off
@@ -105,6 +115,7 @@ void bus_init(FileBinary* bin) {
   {
     case 0: io_panic("(CPU) 0x00 UNEXPECTED_HALT"); break;
     case 1: io_panic("(CPU) 0x01 ILLEGAL_INSTR"); break;
+    case 2: io_panic("(CPU) 0x02 ILLEGAL_BYTECODE"); break;
     default: io_panic("(CPU) 0xFF UNKNOWN"); break;
   }
   cpu6502_setClockMode(CPUCLOCK_HALT);
@@ -178,25 +189,25 @@ void bus_writeCPU(uint16_t addr, uint8_t data) {
   } else if (addr <= 0x3FFF) {
     addr = (addr & 0x0007) | 0x2000;
     if (addr == 0x2000) { // ppu control
-      ppu_setRegister(PPU_CONTROL, data);
+      ppu_writeRegister(PPU_CONTROL, data);
     } else if (addr == 0x2001) { // ppu mask
-      ppu_setRegister(PPU_MASK, data);
+      ppu_writeRegister(PPU_MASK, data);
     } else if (addr == 0x2002) { // ppu status
-      ppu_setRegister(PPU_STATUS, data);
+      ppu_writeRegister(PPU_STATUS, data);
     } else if (addr == 0x2003) { // ppu oam address
-      ppu_setRegister(PPU_OAMADDR, data);
+      ppu_writeRegister(PPU_OAMADDR, data);
     } else if (addr == 0x2004) { // ppu oam data
-      ppu_setRegister(PPU_OAMDATA, data);
+      ppu_writeRegister(PPU_OAMDATA, data);
     } else if (addr == 0x2005) { // ppu scroll
-      ppu_setRegister(PPU_SCROLL, data);
+      ppu_writeRegister(PPU_SCROLL, data);
     } else if (addr == 0x2006) { // ppu address
-      ppu_setRegister(PPU_PPUADDR, data);
+      ppu_writeRegister(PPU_PPUADDR, data);
     } else if (addr == 0x2007) { // ppu data
-      ppu_setRegister(PPU_PPUDATA, data);
+      ppu_writeRegister(PPU_PPUDATA, data);
     }
   } else if (addr <= 0x4017) {
     if (addr == 0x4014) {
-      ppu_setRegister(PPU_OAMDMA, data);
+      ppu_writeRegister(PPU_OAMDMA, data);
     } else if (addr == 0x4016) {
       joypad_write(data);
     }
@@ -220,25 +231,25 @@ uint8_t bus_readCPU(uint16_t addr) {
   } else if (addr <= 0x3FFF) {
     addr = (addr & 0x0007) | 0x2000;
     if (addr == 0x2000) {
-      return ppu_getRegister(PPU_CONTROL);
+      return ppu_readRegister(PPU_CONTROL);
     } else if (addr == 0x2001) {
-      return ppu_getRegister(PPU_MASK);
+      return ppu_readRegister(PPU_MASK);
     } else if (addr == 0x2002) {
-      return ppu_getRegister(PPU_STATUS);
+      return ppu_readRegister(PPU_STATUS);
     } else if (addr == 0x2003) {
-      return ppu_getRegister(PPU_OAMADDR);
+      return ppu_readRegister(PPU_OAMADDR);
     } else if (addr == 0x2004) {
-      return ppu_getRegister(PPU_OAMDATA);
+      return ppu_readRegister(PPU_OAMDATA);
     } else if (addr == 0x2005) {
-      return ppu_getRegister(PPU_SCROLL);
+      return ppu_readRegister(PPU_SCROLL);
     } else if (addr == 0x2006) {
-      return ppu_getRegister(PPU_PPUADDR);
+      return ppu_readRegister(PPU_PPUADDR);
     } else if (addr == 0x2007) {
-      return ppu_getRegister(PPU_PPUDATA);
+      return ppu_readRegister(PPU_PPUDATA);
     }
   } else if (addr <= 0x4017) {
     if (addr == 0x4014) {
-      return ppu_getRegister(PPU_OAMDMA);
+      return ppu_readRegister(PPU_OAMDMA);
     } else if (addr == 0x4016) {
       return joypad_read();
     }
@@ -320,24 +331,27 @@ void bus_unsetJoypad(JoypadButton button) {
 }
 
 void bus_initClock() {
-
   struct timeval tv1, tv2;
   gettimeofday(&tv1, NULL);
   uint64_t elapsed;
-
+  
   while (cpu6502_getClockMode() != CPUCLOCK_HALT)
   {
     gettimeofday(&tv2, NULL);
     elapsed = ((tv2.tv_sec - tv1.tv_sec) * 1000000) + (tv2.tv_usec - tv1.tv_usec);
 
+    // suspend CPU until specified time has elapsed
     if (elapsed >= DISPLAY_FRAME_USEC) {
       bus_frameIntervalReport();
       tv1 = tv2;
       elapsed -= DISPLAY_FRAME_USEC;
     }
 
-    if (!cpuPaused) {
-      cpu6502_step(NULL, &bus_cpuReport);
+    if (LOGGING && !cpuPaused) {
+      cpu6502_step(trace, &bus_cpuReport);
+      logging_saveNESTrace(trace, totalCPUCycles); 
+    } else {
+      if (!cpuPaused) cpu6502_step(NULL, &bus_cpuReport);
     }
   }
 
@@ -353,6 +367,7 @@ void bus_initPPU() {
 
 void bus_cpuReport(uint8_t cycleCount) {
   cyclesPerSec += cycleCount;
+  totalCPUCycles += cycleCount;
   // update PPU
   #if (!HEADLESS)
   ppuCycleDebt += cycleCount;
@@ -393,7 +408,7 @@ void bus_cpuReport(uint8_t cycleCount) {
   }
 
   #if (DEBUG_MODE)
-  exc_trace(&trace);
+
   #endif
 }
 
@@ -461,20 +476,4 @@ void bus_triggerNMI() {
 void bus_triggerCPUPanic() {
     io_panic("(SYS) 0x00 TRIGGER_PANIC");
     while (true) io_pollJoypad(&bus_handleInput);
-}
-
-void bus_cpuKillReport() {
-    uint32_t realTimeCount = frameIntervalCount / DISPLAY_FRAMERATE;
-
-    double floatingCPUTime = (double) cpuTimeCount;
-    double floatingRealTime = (double) realTimeCount;
-    double realClockSpeed = (((double)CPU_FREQUENCY) * (floatingCPUTime / floatingRealTime)) / 1000000;
-
-    printf("** EMULATION STOPPED **\n");
-    printf("\n");
-    printf("CPU Time Elapsed: %d seconds\n", cpuTimeCount);
-    printf("Real Time Elapsed: %d seconds\n", realTimeCount);
-    printf("\n");
-    printf("Real Clock Speed: %.4f MHz\n", realClockSpeed);
-    printf("\n");
 }

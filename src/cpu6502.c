@@ -47,12 +47,12 @@ void cpu6502_init(void(*w)(uint16_t, uint8_t), uint8_t(*r)(uint16_t), CPUEmulati
   reg.s = 0xFD;
   reg.pc = cpu6502_read16(0xFFFC);
 
-  if (emuMode == CPUEMU_INTERPRET_CACHED) {
+  if (emuMode == CPUEMU_INTERPRET_CACHED || emuMode == CPUEMU_RECOMPILE_STATIC) {
     static BytecodeProgram prog;
     prgBytecode = &prog;
     prog.bytecodeCount = 0;
     for (int i = 0; i < 65536; i++) {
-      prog.addrMap[i] = 0xFFFF;
+      prog.addrMap[i] = 0x0000;
     }
     prog.bytecodes = malloc(sizeof(Bytecode));
   }
@@ -76,7 +76,7 @@ void cpu6502_step(char* traceStr, void(*c)(uint8_t)) {
 
     c(cpu6502_execute(&bytecode));
   } else if (emuMode == CPUEMU_INTERPRET_CACHED) {
-    if (prgBytecode->addrMap[reg.pc] == 0xFFFF) {
+    if (prgBytecode->addrMap[reg.pc] == 0x0000) {
       // bytecode not compiled yet
       Bytecode bytecode;
       cpu6502_parseOpcode(memRead(reg.pc), &bytecode);
@@ -94,6 +94,17 @@ void cpu6502_step(char* traceStr, void(*c)(uint8_t)) {
       logging_bytecodeToTrace(reg, b, traceStr, memWrite, memRead);
     }
     c(cpu6502_execute(b));
+  } else if (emuMode == CPUEMU_RECOMPILE_STATIC) {
+    if (prgBytecode->addrMap[reg.pc] == 0x0000) {
+      clockMode = CPUCLOCK_HALT;
+      cpuerrno = 0x02;
+    } else {
+      Bytecode* b = &prgBytecode->bytecodes[prgBytecode->addrMap[reg.pc]];
+      if (traceStr != NULL) {
+        logging_bytecodeToTrace(reg, b, traceStr, memWrite, memRead);
+      }
+      c(cpu6502_execute(b));
+    }
   }
 }
 
@@ -161,6 +172,31 @@ void cpu6502_dasm(uint8_t* prgData, uint32_t prgSize, void(*c)(char c[128]), uin
     }
     logging_bytecodeToAssembly(pointer, &bytecode, line, flags);
     c(line);
+  }
+}
+
+void cpu6502_loadBytecodeProgram(uint8_t* prgData, uint32_t prgSize) {
+  // populate entries
+  uint32_t pointer = 0x0000;
+  while (pointer < prgSize) {
+    Bytecode bytecode;
+    cpu6502_parseOpcode(prgData[pointer], &bytecode);
+    int offset = 0;
+    for (int i = 0; i < bytecode.count; i++) {
+      bytecode.data[i] = prgData[pointer + i];
+      offset += 1;
+    }
+    
+    prgBytecode->bytecodeCount += 1;
+    prgBytecode->bytecodes = realloc(prgBytecode->bytecodes, sizeof(Bytecode) * (prgBytecode->bytecodeCount + 1));
+    prgBytecode->bytecodes[prgBytecode->bytecodeCount - 1] = bytecode;
+    
+    // account for mirroring
+    for (int i = pointer; i < 0xFFFF; i += prgSize) {
+      prgBytecode->addrMap[i] = prgBytecode->bytecodeCount - 1;
+    }
+    
+    pointer += offset;
   }
 }
 

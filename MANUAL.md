@@ -26,6 +26,7 @@ The following exceptions may be encountered:
 |------|------|--------------------|------------
 | CPU  | 0x00 | UNEXPECTED_HALT    | CPU halted unexpectedly
 | CPU  | 0x01 | ILLEGAL_INSTR      | CPU encountered an unimplemented instruction
+| CPU  | 0x02 | ILLEGAL_BYTECODE   | CPU encountered a recompilation error
 | CPU  | 0xFF | UNKNOWN            | An unknown CPU error occurred
 | I/O  | 0x00 | NO_ROM             | No ROM was provided to the program
 | I/O  | 0x01 | INVALID_ROM        | The provided ROM could not be decoded

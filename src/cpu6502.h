@@ -34,6 +34,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define CPU_DEBUG FALSE
 
@@ -128,6 +129,15 @@ static force_inline uint16_t cpu6502_read16(uint16_t addr);
  * @param c the callback which runs for each line generated
  */
 void cpu6502_dasm(uint8_t* prgData, uint32_t prgSize, void(*c)(char c[128]), uint8_t flags);
+
+/**
+ * @brief Recompile machine code into bytecode
+ * 
+ * @param prgData the program binary
+ * @param prgSize the program size (in bytes)
+ * @param bprog the pointer to the bytecode program object
+ */
+void cpu6502_loadBytecodeProgram(uint8_t* prgData, uint32_t prgSize);
 
 /**
  * @brief Determine the mnemonic, addressing mode, and size of

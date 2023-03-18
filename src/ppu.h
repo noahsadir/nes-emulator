@@ -164,7 +164,7 @@ bool ppu_getControlFlag(enum PPUControlFlag flag);
  * @param reg the register to read
  * @return uint8_t the value of the register
  */
-uint8_t ppu_getRegister(PPURegisterType reg);
+uint8_t ppu_readRegister(PPURegisterType reg);
 
 /**
  * @brief Directly set the value of the register
@@ -172,28 +172,9 @@ uint8_t ppu_getRegister(PPURegisterType reg);
  * @param reg the register to write to
  * @param data the value to set the register to
  */
-void ppu_setRegister(PPURegisterType r, uint8_t data);
-
-/**
- * @brief Get number of frames generated
- * 
- * @return uint64_t the number of frames
- */
-uint64_t ppu_getFrames();
-
-/**
- * @brief Get a 256 x 240 bitmap of the display
- * 
- * @return uint32_t* the bitmap array
- */
-uint32_t* ppu_getDisplayBitmap();
+void ppu_writeRegister(PPURegisterType r, uint8_t data);
 
 /* PRIVATE METHODS - NOT INTENDED FOR EXTERNAL USE */
-
-/**
- * @brief Draw the CHR ROM
- */
-void ppu_drawCHRROM(uint16_t bank);
 
 /**
  * @brief Parse CHR ROM data for quicker reading
@@ -232,15 +213,9 @@ static force_inline void ppu_drawScanline(uint8_t y);
 static force_inline void ppu_drawFrame();
 
 /**
- * @brief Perform read operation at mapped address
- * 
- * @param address the address to read
- * @return uint8_t the data from the specified address
- */
-static force_inline uint8_t ppu_readMem(uint16_t address);
-
-/**
- * @brief Perform write operation at mapped address
+ * @brief Perform write operation at mapped address.
+ *        Note that read operations are simply done through
+ *        direct array access.
  * 
  * @param address the address to write to
  * @param data the data to write
