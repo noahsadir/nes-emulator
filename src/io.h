@@ -89,9 +89,9 @@ void io_printString(char* str, uint16_t x, uint8_t y);
 /**
  * @brief Trigger panic
  * 
- * @param str the error message
+ * @param code the panic code
  */
-void io_panic(char* str);
+void io_panic(PanicCodes code);
 
 /**
  * @brief Print a character to display

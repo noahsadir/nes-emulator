@@ -68,17 +68,16 @@ void bus_init(FileBinary* bin) {
 
   // panic if issues with rom
   if (bin == NULL) {
-    io_panic("(I/O) 0x00 NO_ROM");
+    io_panic(IO_NO_ROM);
     while (true) io_pollJoypad(&bus_handleInput);
   }
 
   if (!bus_parseROM(bin)) {
-    io_panic("(I/O) 0x01 INVALID_ROM");
+    io_panic(IO_INVALID_ROM);
     while (true) io_pollJoypad(&bus_handleInput);
   }
 
   if (HEADLESS) {
-    // looks like somebody chopped off the PPU!
     io_printString("DISPLAY OFF", 88, 64);
   }
 
@@ -86,37 +85,25 @@ void bus_init(FileBinary* bin) {
     logging_init();
   }
 
-  CPUEmulationMode mode = EMU_MODE; // perhaps this could be set dynamically?
-
   // initialize hardware
   ppu_init(cartridge.chrRom, cartridge.header.mirroringType == MIRRORING_VERTICAL, &bus_readCPU, &bus_ppuReport);
-  cpu6502_init(&bus_writeCPU, &bus_readCPU, mode);
+  cpu6502_init(&bus_writeCPU, &bus_readCPU);
 
   #if (LIMIT_CLOCK_SPEED)
-  //bus_initClock();
+  bus_initClock();
   #endif
 
-  // determine if emulator should run in disassembly mode or not
-  if (mode == CPUEMU_INTERPRET_DIRECT || mode == CPUEMU_INTERPRET_CACHED) {
-    while (cpu6502_getClockMode() != CPUCLOCK_HALT) {
-      cpu6502_step(trace, &bus_cpuReport);
-    }
-  } else if (mode == CPUEMU_RECOMPILE_STATIC) {
-    cpu6502_loadBytecodeProgram(cartridge.prgRom, (uint32_t)cartridge.header.prgRomSize * 16384);
-    while (cpu6502_getClockMode() != CPUCLOCK_HALT) {
-      cpu6502_step(NULL, &bus_cpuReport);
-    }
-  } else if (mode == CPUEMU_DISASSEMBLE) {
-    //cpu6502_dasm(cartridge.prgRom, rom.header.prgRomSize * 16384, &nes_handleDisassemblyLine, DASM_MINIMAL);
+  while (cpu6502_getClockMode() != CPUCLOCK_HALT) {
+    cpu6502_step(trace, &bus_cpuReport);
   }
 
   // CPU should never halt until shut off
   switch (cpu6502_getErrno())
   {
-    case 0: io_panic("(CPU) 0x00 UNEXPECTED_HALT"); break;
-    case 1: io_panic("(CPU) 0x01 ILLEGAL_INSTR"); break;
-    case 2: io_panic("(CPU) 0x02 ILLEGAL_BYTECODE"); break;
-    default: io_panic("(CPU) 0xFF UNKNOWN"); break;
+    case 0: io_panic(CPU_UNEXPECTED_HALT); break;
+    case 1: io_panic(CPU_ILLEGAL_INSTR); break;
+    case 2: io_panic(CPU_ILLEGAL_BYTECODE); break;
+    default: io_panic(CPU_UNKNOWN); break;
   }
   cpu6502_setClockMode(CPUCLOCK_HALT);
   while (true) io_pollJoypad(&bus_handleInput); // wait for user to exit, essentially
@@ -288,7 +275,7 @@ void bus_cartridgeWrite(uint16_t addr, uint8_t data) {
       // invalid write
     }
   } else {
-    io_panic("(I/O) 0x02 UNSUPPORTED_MAPPER");
+    io_panic(IO_UNSUPPORTED_MAPPER);
     while (true) io_pollJoypad(&bus_handleInput);
   }
 }
@@ -316,7 +303,7 @@ uint8_t bus_cartridgeRead(uint16_t addr) {
       }
     }
   } else {
-    io_panic("(I/O) 0x02 UNSUPPORTED_MAPPER");
+    io_panic(IO_UNSUPPORTED_MAPPER);
     while (true) io_pollJoypad(&bus_handleInput);
   }
   return 0;
@@ -355,7 +342,7 @@ void bus_initClock() {
     }
   }
 
-  io_panic("(CPU) 0x00 UNEXPECTED_HALT");
+  io_panic(CPU_UNEXPECTED_HALT);
   while (true) io_pollJoypad(&bus_handleInput);
 }
 
@@ -418,7 +405,7 @@ void bus_frameIntervalReport() {
 }
 
 void bus_ppuReport() {
-  // If desired, alculate & display framerate and CPU frequency
+  // If desired, calculate & display framerate and CPU frequency
   #if (PERFORMANCE_DEBUG)
   gettimeofday(&pd2, NULL); // poll delay
   uint32_t delayCounter = (pd2.tv_sec - pd1.tv_sec);
@@ -474,6 +461,6 @@ void bus_triggerNMI() {
 }
 
 void bus_triggerCPUPanic() {
-    io_panic("(SYS) 0x00 TRIGGER_PANIC");
+    io_panic(SYS_TRIGGER_PANIC);
     while (true) io_pollJoypad(&bus_handleInput);
 }

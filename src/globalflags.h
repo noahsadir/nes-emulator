@@ -89,16 +89,6 @@
  */
 #define PPU_IMMEDIATE_CATCHUP FALSE
 
-/**
- * @brief Determine how the CPU should handle programs
- *        CPUEMU_INTERPRET_DIRECT - Decode instruction every time 
- *                                  it is encountered.
- *        CPUEMU_INTERPRET_CACHED - Store encountered instructions as
- *                                  bytecode for quicker decoding.
- *       
- */
-#define EMU_MODE CPUEMU_INTERPRET_CACHED
-
 // magic numbers
 
 #define DISPLAY_WIDTH 256
@@ -153,17 +143,21 @@ typedef struct {
 } FileBinary;
 
 typedef enum {
-  CPUEMU_INTERPRET_DIRECT,
-  CPUEMU_INTERPRET_CACHED,
-  CPUEMU_RECOMPILE_STATIC,
-  CPUEMU_DISASSEMBLE,
-} CPUEmulationMode;
-
-typedef enum {
   CPUCLOCK_SUSPENDED,
   CPUCLOCK_STEP_MANUAL,
   CPUCLOCK_HALT
 } CPUClockMode;
+
+typedef enum {
+  CPU_UNEXPECTED_HALT   = 0x000,
+  CPU_ILLEGAL_INSTR     = 0x001,
+  CPU_ILLEGAL_BYTECODE  = 0x002,
+  CPU_UNKNOWN           = 0x0FF,
+  IO_NO_ROM             = 0x100,
+  IO_INVALID_ROM        = 0x101,
+  IO_UNSUPPORTED_MAPPER = 0x102,
+  SYS_TRIGGER_PANIC     = 0x200
+} PanicCodes;
 
 typedef enum {
   DASM_MINIMAL  = 0x0,

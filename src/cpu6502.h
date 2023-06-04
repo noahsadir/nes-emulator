@@ -45,7 +45,7 @@
  * @param r the pointer to the read function
  * @param mode the emulation mode
  */
-void cpu6502_init(void(*w)(uint16_t, uint8_t), uint8_t(*r)(uint16_t), CPUEmulationMode mode);
+void cpu6502_init(void(*w)(uint16_t, uint8_t), uint8_t(*r)(uint16_t));
 
 /**
  * @brief Execute a CPU instruction

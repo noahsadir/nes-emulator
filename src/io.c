@@ -127,10 +127,20 @@ void io_pollJoypad(void(*toggle)(NESInput, bool)) {
   }
 }
 
-void io_panic(char* str) {
+void io_panic(PanicCodes code) {
   didPanic = true;
   for (int i = 0; i < DISPLAY_HEIGHT * DISPLAY_WIDTH; i++) {
     panicbmp[i] = colors[0x0F];
+  }
+  char* str;
+  switch (code) {
+    case CPU_UNEXPECTED_HALT:   str = "(CPU) 0x00 UNEXPECTED_HALT";
+    case CPU_ILLEGAL_INSTR:     str = "(CPU) 0x01 ILLEGAL_INSTR";
+    case CPU_ILLEGAL_BYTECODE:  str = "(CPU) 0x02 ILLEGAL_BYTECODE";
+    case IO_NO_ROM:             str = "(I/O) 0x00 NO_ROM";
+    case IO_INVALID_ROM:        str = "(I/O) 0x01 INVALID_ROM";
+    case IO_UNSUPPORTED_MAPPER: str = "(I/O) 0x02 UNSUPPORTED_MAPPER";
+    default:                    str = "(NUL) 0xFF UNKNOWN";
   }
   int len = 0;
   while (str[len] != '\0') len += 1;
@@ -196,10 +206,10 @@ void io_drawDebugNametable() {
       int ntRow = (i - (ntID * 0x400)) / 32;
       int ntCol = (i - (ntID * 0x400)) % 32;
       if ((i - (ntID * 0x400)) < 960) {
-        for (int k = 0; k < 64; k++) {
-          int tileCol = 8 - (k % 8);
-          int tileRow = k / 8;
-          debugbmp[(ntRow * 512 * 8) + (ntCol * 8) + (tileRow * 512) + tileCol + ((ntID % 2) * 256) + ((ntID > 1) * (DISPLAY_BITMAP_SIZE * 2))] = colors[(chrCache[vidRAM[i] + (256 * DBG_BKG_BANK)][k] * 3) + 15];
+        for (int k = 0; k < 16; k++) {
+          int tileCol = 4 - (k % 4);
+          int tileRow = k / 4;
+          debugbmp[(ntRow * 512 * 4) + (ntCol * 4) + (tileRow * 512) + tileCol + ((ntID % 2) * 128) + ((ntID > 1) * (DISPLAY_BITMAP_SIZE))] = colors[(chrCache[vidRAM[i] + (256 * DBG_BKG_BANK)][(8 - tileCol) + (tileRow * 8)] * 3) + 15];
         }
       }
     }
@@ -207,6 +217,7 @@ void io_drawDebugNametable() {
 }
 
 void io_update(char* overlay) {
+  /// TODO: this is ugly; needs refactoring
   gettimeofday(&t2, NULL);
   uint32_t delayCounter = (t2.tv_sec - t1.tv_sec) * 1000000.0;
   delayCounter += (t2.tv_usec - t1.tv_usec);
@@ -224,6 +235,7 @@ void io_update(char* overlay) {
       io_printString(overlay, 4, 4);
       return;
     }
+    
     // update display
     SDL_FreeSurface(surface);
     uint32_t* pixels = (uint32_t*)surface->pixels;

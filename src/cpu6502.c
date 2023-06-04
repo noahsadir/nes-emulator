@@ -25,7 +25,6 @@
 #include "cpu6502.h"
 
 CPURegisters reg;
-CPUEmulationMode emuMode;
 CPUClockMode clockMode = CPUCLOCK_SUSPENDED;
 
 void(*memWrite)(uint16_t, uint8_t);
@@ -35,10 +34,9 @@ BytecodeProgram* prgBytecode;
 
 uint8_t cpuerrno = 0;
 
-void cpu6502_init(void(*w)(uint16_t, uint8_t), uint8_t(*r)(uint16_t), CPUEmulationMode mode) {
+void cpu6502_init(void(*w)(uint16_t, uint8_t), uint8_t(*r)(uint16_t)) {
   memWrite = w;
   memRead = r;
-  emuMode = mode;
 
   reg.p = 0x24;
   reg.a = 0x00;
@@ -47,15 +45,13 @@ void cpu6502_init(void(*w)(uint16_t, uint8_t), uint8_t(*r)(uint16_t), CPUEmulati
   reg.s = 0xFD;
   reg.pc = cpu6502_read16(0xFFFC);
 
-  if (emuMode == CPUEMU_INTERPRET_CACHED || emuMode == CPUEMU_RECOMPILE_STATIC) {
-    static BytecodeProgram prog;
-    prgBytecode = &prog;
-    prog.bytecodeCount = 0;
-    for (int i = 0; i < 65536; i++) {
-      prog.addrMap[i] = 0x0000;
-    }
-    prog.bytecodes = malloc(sizeof(Bytecode));
+  static BytecodeProgram prog;
+  prgBytecode = &prog;
+  prog.bytecodeCount = 0;
+  for (int i = 0; i < 65536; i++) {
+    prog.addrMap[i] = 0x0000;
   }
+  prog.bytecodes = malloc(sizeof(Bytecode));
 
   #if (CPU_DEBUG)
   reg.pc = 0xC000;
@@ -63,49 +59,24 @@ void cpu6502_init(void(*w)(uint16_t, uint8_t), uint8_t(*r)(uint16_t), CPUEmulati
 }
 
 void cpu6502_step(char* traceStr, void(*c)(uint8_t)) {
-  if (emuMode == CPUEMU_INTERPRET_DIRECT) {
+  if (prgBytecode->addrMap[reg.pc] == 0x0000) {
+    // bytecode not compiled yet
     Bytecode bytecode;
     cpu6502_parseOpcode(memRead(reg.pc), &bytecode);
     for (int i = 0; i < bytecode.count; i++) {
       bytecode.data[i] = memRead(reg.pc + i);
     }
-
-    if (traceStr != NULL) {
-      logging_bytecodeToTrace(reg, &bytecode, traceStr, memWrite, memRead);
-    }
-
-    c(cpu6502_execute(&bytecode));
-  } else if (emuMode == CPUEMU_INTERPRET_CACHED) {
-    if (prgBytecode->addrMap[reg.pc] == 0x0000) {
-      // bytecode not compiled yet
-      Bytecode bytecode;
-      cpu6502_parseOpcode(memRead(reg.pc), &bytecode);
-      for (int i = 0; i < bytecode.count; i++) {
-        bytecode.data[i] = memRead(reg.pc + i);
-      }
-      prgBytecode->bytecodeCount += 1;
-      prgBytecode->bytecodes = realloc(prgBytecode->bytecodes, sizeof(Bytecode) * (prgBytecode->bytecodeCount + 1));
-      prgBytecode->bytecodes[prgBytecode->bytecodeCount - 1] = bytecode;
-      prgBytecode->addrMap[reg.pc] = prgBytecode->bytecodeCount - 1;
-    }
-
-    Bytecode* b = &prgBytecode->bytecodes[prgBytecode->addrMap[reg.pc]];
-    if (traceStr != NULL) {
-      logging_bytecodeToTrace(reg, b, traceStr, memWrite, memRead);
-    }
-    c(cpu6502_execute(b));
-  } else if (emuMode == CPUEMU_RECOMPILE_STATIC) {
-    if (prgBytecode->addrMap[reg.pc] == 0x0000) {
-      clockMode = CPUCLOCK_HALT;
-      cpuerrno = 0x02;
-    } else {
-      Bytecode* b = &prgBytecode->bytecodes[prgBytecode->addrMap[reg.pc]];
-      if (traceStr != NULL) {
-        logging_bytecodeToTrace(reg, b, traceStr, memWrite, memRead);
-      }
-      c(cpu6502_execute(b));
-    }
+    prgBytecode->bytecodeCount += 1;
+    prgBytecode->bytecodes = realloc(prgBytecode->bytecodes, sizeof(Bytecode) * (prgBytecode->bytecodeCount + 1));
+    prgBytecode->bytecodes[prgBytecode->bytecodeCount - 1] = bytecode;
+    prgBytecode->addrMap[reg.pc] = prgBytecode->bytecodeCount - 1;
   }
+
+  Bytecode* b = &prgBytecode->bytecodes[prgBytecode->addrMap[reg.pc]];
+  if (traceStr != NULL) {
+    logging_bytecodeToTrace(reg, b, traceStr, memWrite, memRead);
+  }
+  c(cpu6502_execute(b));
 }
 
 void cpu6502_nmi() {
